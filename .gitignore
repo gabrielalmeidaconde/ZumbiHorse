@@ -1,0 +1,38 @@
+# Pastas geradas pelo Unity (recriadas ao abrir o projeto)
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Builds (gere pelo menu "Zumbi Horse")
+/[Bb]uild/
+/[Bb]uilds/
+*.zip
+
+# Arquivos gerados pelas IDEs
+.vs/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Outros
+*.unitypackage
+*.apk
+*.aab
+sysinfo.txt
+crashlytics-build.properties
+.DS_Store

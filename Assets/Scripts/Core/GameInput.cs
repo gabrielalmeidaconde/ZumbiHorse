@@ -1,0 +1,362 @@
+using System.Collections.Generic;
+using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
+
+public enum DeviceKind { Keyboard1, Keyboard2, Gamepad, Bot }
+
+/// <summary>
+/// Fonte de input de um jogador: metade esquerda do teclado (WASD), metade direita (setas),
+/// um controle ou um bot (usado apenas pelo modo demo de testes).
+/// </summary>
+public class InputSource
+{
+    public DeviceKind Kind;
+    public int PadNumber;
+#if ENABLE_INPUT_SYSTEM
+    public Gamepad Pad;
+#endif
+
+    // Estado controlado pelo DemoDriver quando Kind == Bot.
+    public Vector2 BotMove;
+    public bool BotJumpHeld;
+    public int BotJumpFrame = -1, BotConfirmFrame = -1, BotRotateFrame = -1, BotRotateCCWFrame = -1;
+
+    const float DeadZone = 0.3f;
+
+    public string Label
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return "Teclado (WASD)";
+                case DeviceKind.Keyboard2: return "Teclado (Setas)";
+                case DeviceKind.Gamepad: return "Controle " + PadNumber;
+                default: return "CPU";
+            }
+        }
+    }
+
+    /// <summary>Mesmo dispositivo físico (usado para não deixar o mesmo controle entrar duas vezes).</summary>
+    public bool SameDevice(InputSource other)
+    {
+        if (other == null || other.Kind != Kind) return false;
+#if ENABLE_INPUT_SYSTEM
+        if (Kind == DeviceKind.Gamepad) return other.Pad == Pad;
+#endif
+        return Kind != DeviceKind.Bot;
+    }
+
+    public bool Connected
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Kind == DeviceKind.Gamepad) return Pad != null && Pad.added;
+#endif
+            return true;
+        }
+    }
+
+    public Vector2 Move
+    {
+        get
+        {
+            Vector2 v = Vector2.zero;
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1:
+                    v.x = (Held(K.D) ? 1 : 0) - (Held(K.A) ? 1 : 0);
+                    v.y = (Held(K.W) ? 1 : 0) - (Held(K.S) ? 1 : 0);
+                    break;
+                case DeviceKind.Keyboard2:
+                    v.x = (Held(K.Right) ? 1 : 0) - (Held(K.Left) ? 1 : 0);
+                    v.y = (Held(K.Up) ? 1 : 0) - (Held(K.Down) ? 1 : 0);
+                    break;
+                case DeviceKind.Gamepad:
+#if ENABLE_INPUT_SYSTEM
+                    if (Connected)
+                    {
+                        Vector2 stick = Pad.leftStick.ReadValue();
+                        Vector2 dpad = Pad.dpad.ReadValue();
+                        v = dpad.sqrMagnitude > 0.1f ? dpad : stick;
+                        if (v.magnitude < DeadZone) v = Vector2.zero;
+                    }
+#endif
+                    break;
+                case DeviceKind.Bot:
+                    v = BotMove;
+                    break;
+            }
+            return Vector2.ClampMagnitude(v, 1f);
+        }
+    }
+
+    public bool JumpHeld
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Held(K.W) || Held(K.Space);
+                case DeviceKind.Keyboard2: return Held(K.Up) || Held(K.Num0);
+                case DeviceKind.Gamepad: return PadHeld(0);
+                default: return BotJumpHeld;
+            }
+        }
+    }
+
+    public bool JumpDown
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.W) || Down(K.Space);
+                case DeviceKind.Keyboard2: return Down(K.Up) || Down(K.Num0);
+                case DeviceKind.Gamepad: return PadDown(0);
+                default: return BotJumpFrame == Time.frameCount;
+            }
+        }
+    }
+
+    /// <summary>Confirmar: entrar no lobby, ficar pronto, pegar/posicionar item.</summary>
+    public bool ConfirmDown
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.Space);
+                case DeviceKind.Keyboard2: return Down(K.Enter) || Down(K.NumEnter);
+                case DeviceKind.Gamepad: return PadDown(0);
+                default: return BotConfirmFrame == Time.frameCount;
+            }
+        }
+    }
+
+    /// <summary>Girar o item no sentido horário.</summary>
+    public bool RotateCWDown
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.E);
+                case DeviceKind.Keyboard2: return Down(K.RightShift);
+                case DeviceKind.Gamepad: return PadDown(3) || PadDown(5);
+                default: return BotRotateFrame == Time.frameCount;
+            }
+        }
+    }
+
+    /// <summary>Girar o item no sentido anti-horário.</summary>
+    public bool RotateCCWDown
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.Q);
+                case DeviceKind.Keyboard2: return Down(K.RightCtrl);
+                case DeviceKind.Gamepad: return PadDown(2) || PadDown(4);
+                default: return BotRotateCCWFrame == Time.frameCount;
+            }
+        }
+    }
+
+    int prevSignY, edgeValueY, edgeFrameY = -1;
+
+    /// <summary>-1/+1 no quadro em que o jogador aperta para baixo/cima (para menus).</summary>
+    public int MoveYPressed()
+    {
+        if (edgeFrameY == Time.frameCount) return edgeValueY;
+        edgeFrameY = Time.frameCount;
+        float y = Move.y;
+        int sign = y > 0.5f ? 1 : y < -0.5f ? -1 : 0;
+        edgeValueY = sign != 0 && sign != prevSignY ? sign : 0;
+        prevSignY = sign;
+        return edgeValueY;
+    }
+
+    int prevSignX, edgeValue, edgeFrame = -1;
+
+    /// <summary>-1/+1 no quadro em que o jogador aperta para a esquerda/direita (para menus).</summary>
+    public int MoveXPressed()
+    {
+        if (edgeFrame == Time.frameCount) return edgeValue;
+        edgeFrame = Time.frameCount;
+        float x = Move.x;
+        int sign = x > 0.5f ? 1 : x < -0.5f ? -1 : 0;
+        edgeValue = sign != 0 && sign != prevSignX ? sign : 0;
+        prevSignX = sign;
+        return edgeValue;
+    }
+
+    /// <summary>Voltar: sair do lobby / cancelar "pronto" / sair da partida no pause.</summary>
+    public bool BackDown
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.Q);
+                case DeviceKind.Keyboard2: return Down(K.Backspace);
+                case DeviceKind.Gamepad: return PadDown(1);
+                default: return false;
+            }
+        }
+    }
+
+    public bool PauseDown
+    {
+        get
+        {
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1:
+                case DeviceKind.Keyboard2: return Down(K.Escape);
+                case DeviceKind.Gamepad: return PadDown(6);
+                default: return false;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape }
+
+#if ENABLE_INPUT_SYSTEM
+    static UnityEngine.InputSystem.Key Map(K k)
+    {
+        switch (k)
+        {
+            case K.W: return UnityEngine.InputSystem.Key.W;
+            case K.A: return UnityEngine.InputSystem.Key.A;
+            case K.S: return UnityEngine.InputSystem.Key.S;
+            case K.D: return UnityEngine.InputSystem.Key.D;
+            case K.Q: return UnityEngine.InputSystem.Key.Q;
+            case K.E: return UnityEngine.InputSystem.Key.E;
+            case K.Space: return UnityEngine.InputSystem.Key.Space;
+            case K.Up: return UnityEngine.InputSystem.Key.UpArrow;
+            case K.Down: return UnityEngine.InputSystem.Key.DownArrow;
+            case K.Left: return UnityEngine.InputSystem.Key.LeftArrow;
+            case K.Right: return UnityEngine.InputSystem.Key.RightArrow;
+            case K.Enter: return UnityEngine.InputSystem.Key.Enter;
+            case K.NumEnter: return UnityEngine.InputSystem.Key.NumpadEnter;
+            case K.Num0: return UnityEngine.InputSystem.Key.Numpad0;
+            case K.RightCtrl: return UnityEngine.InputSystem.Key.RightCtrl;
+            case K.RightShift: return UnityEngine.InputSystem.Key.RightShift;
+            case K.Backspace: return UnityEngine.InputSystem.Key.Backspace;
+            default: return UnityEngine.InputSystem.Key.Escape;
+        }
+    }
+
+    static bool Held(K k) => Keyboard.current != null && Keyboard.current[Map(k)].isPressed;
+    static bool Down(K k) => Keyboard.current != null && Keyboard.current[Map(k)].wasPressedThisFrame;
+
+    // 0 A(sul) 1 B(leste) 2 X(oeste) 3 Y(norte) 4 LB 5 RB 6 Start
+    UnityEngine.InputSystem.Controls.ButtonControl PadButton(int b)
+    {
+        switch (b)
+        {
+            case 0: return Pad.buttonSouth;
+            case 1: return Pad.buttonEast;
+            case 2: return Pad.buttonWest;
+            case 3: return Pad.buttonNorth;
+            case 4: return Pad.leftShoulder;
+            case 5: return Pad.rightShoulder;
+            default: return Pad.startButton;
+        }
+    }
+
+    bool PadHeld(int b) => Kind == DeviceKind.Gamepad && Connected && PadButton(b).isPressed;
+    bool PadDown(int b) => Kind == DeviceKind.Gamepad && Connected && PadButton(b).wasPressedThisFrame;
+#else
+    // Fallback para o Input Manager antigo: só os dois lados do teclado (sem controles).
+    static KeyCode Map(K k)
+    {
+        switch (k)
+        {
+            case K.W: return KeyCode.W;
+            case K.A: return KeyCode.A;
+            case K.S: return KeyCode.S;
+            case K.D: return KeyCode.D;
+            case K.Q: return KeyCode.Q;
+            case K.E: return KeyCode.E;
+            case K.Space: return KeyCode.Space;
+            case K.Up: return KeyCode.UpArrow;
+            case K.Down: return KeyCode.DownArrow;
+            case K.Left: return KeyCode.LeftArrow;
+            case K.Right: return KeyCode.RightArrow;
+            case K.Enter: return KeyCode.Return;
+            case K.NumEnter: return KeyCode.KeypadEnter;
+            case K.Num0: return KeyCode.Keypad0;
+            case K.RightCtrl: return KeyCode.RightControl;
+            case K.RightShift: return KeyCode.RightShift;
+            case K.Backspace: return KeyCode.Backspace;
+            default: return KeyCode.Escape;
+        }
+    }
+
+    static bool Held(K k) => Input.GetKey(Map(k));
+    static bool Down(K k) => Input.GetKeyDown(Map(k));
+    bool PadHeld(int b) => false;
+    bool PadDown(int b) => false;
+#endif
+
+    // ------------------------------------------------------------------ dispositivos
+
+    static readonly InputSource keyboard1 = new InputSource { Kind = DeviceKind.Keyboard1 };
+    static readonly InputSource keyboard2 = new InputSource { Kind = DeviceKind.Keyboard2 };
+#if ENABLE_INPUT_SYSTEM
+    static readonly Dictionary<Gamepad, InputSource> pads = new Dictionary<Gamepad, InputSource>();
+#endif
+
+    /// <summary>Todos os dispositivos que podem entrar na partida neste momento.</summary>
+    public static List<InputSource> AvailableDevices()
+    {
+        var list = new List<InputSource> { keyboard1, keyboard2 };
+#if ENABLE_INPUT_SYSTEM
+        int n = 0;
+        foreach (var pad in Gamepad.all)
+        {
+            n++;
+            if (!pads.TryGetValue(pad, out var src))
+            {
+                src = new InputSource { Kind = DeviceKind.Gamepad, Pad = pad };
+                pads[pad] = src;
+            }
+            src.PadNumber = n;
+            list.Add(src);
+        }
+#endif
+        return list;
+    }
+
+    public static int GamepadCount
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Gamepad.all.Count;
+#else
+            return 0;
+#endif
+        }
+    }
+
+    public static bool GamepadsSupported
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            return true;
+#else
+            return false;
+#endif
+        }
+    }
+}

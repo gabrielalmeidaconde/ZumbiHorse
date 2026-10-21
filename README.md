@@ -1,0 +1,208 @@
+# Ultimate Zumbi Horse
+
+Versão simples de **Ultimate Chicken Horse** com zumbis, feita em **Unity 6 (6000.3.25f1)**.
+Para 2 a 4 jogadores no mesmo computador.
+
+Cada rodada tem três fases:
+
+1. **Caixa de itens**: cada jogador escolhe um item com o seu cursor.
+2. **Posicionamento**: todos colocam o item na fase ao mesmo tempo (blocos para ajudar, armadilhas para atrapalhar).
+3. **Corrida**: todos os zumbis correm da largada até o **cérebro**. Quem morre fica fora da rodada.
+
+Os itens ficam na fase de uma rodada para a outra, então ela vai ficando cada vez mais difícil.
+
+## Bots (jogadores do computador)
+
+No lobby, qualquer jogador controla os bots:
+
+| Ação | Teclado WASD | Teclado Setas | Controle |
+|---|---|---|---|
+| Colocar um bot | W | Seta para cima | Cima |
+| Tirar o último bot | S | Seta para baixo | Baixo |
+| Mudar a dificuldade do último bot | E | Shift direito | RB (ou Y) |
+
+Dá para misturar dificuldades (ex.: coloque um bot, deixe-o Difícil, coloque outro e deixe-o Fácil).
+Se os 4 lugares estiverem ocupados e um humano apertar CONFIRMAR, ele toma o lugar do último bot.
+A partida precisa de pelo menos um humano.
+
+| Dificuldade | Como joga |
+|---|---|
+| Fácil | Demora para reagir, erra pulos, quase não presta atenção em serras/trens/fogo e coloca itens em qualquer lugar |
+| Médio | Reage razoavelmente, erra de vez em quando, espera os perigos passarem e mira as armadilhas mais ou menos no caminho |
+| Difícil | Rápido e preciso, desvia de serras, trens, fogo e ossos, pega carona no trem e coloca as armadilhas bem no caminho sem deixar a fase impossível |
+
+Como funciona: cada bot monta um mapa de navegação da fase (onde dá para ficar em pé e quais
+pulos funcionam, simulando a mesma física do zumbi), procura o caminho mais curto até o cérebro e
+"aperta os botões" como um jogador. Antes de pular, os bots Médio e Difícil simulam o pulo prevendo
+onde estarão as serras móveis, os trens e o fogo.
+
+Quando a fase fica impossível (ou eles empacam), os bots não ficam parados para sempre:
+
+- **Sem caminho até o cérebro**: vão até o ponto mais perto dele que conseguem alcançar e tentam um pulo no escuro.
+- **Empacados esperando um perigo passar**: depois de alguns segundos param de esperar e arriscam.
+- **Sem chegar mais perto do cérebro por muito tempo** (7 s sem caminho, 18 s com caminho): **desistem**
+  (o zumbi explode com "DESISTIU!"), para a rodada poder acabar.
+- Se um pulo cai num lugar inesperado (vento, esteira, caixa podre...), eles evitam aquele pulo e procuram outro caminho.
+
+## Mapas
+
+No lobby, qualquer jogador troca o mapa com **esquerda/direita** (A/D, setas ou analógico).
+
+| Mapa | O que tem |
+|---|---|
+| Cemitério | O clássico: três buracos e um paredão |
+| Estação Fantasma | Um trem fantasma vai e volta no fundo do vale (dá para pegar carona no teto; as pontas matam) |
+| Serraria | Serras fixas, uma serra que sobe e desce num pilar, outra que varre o chão e um poço de espinhos |
+| Pântano Ácido | Ilhas no meio de poças de ácido, chão de gelo e uma serra que sobe e desce |
+| Ferrovia Dupla | Dois trens em pontes sobre o ácido, a de cima quebrada no meio |
+| Aleatório | Sorteia um dos mapas quando a partida começa |
+
+Não dá para colocar itens no trilho do trem (área marcada durante o posicionamento).
+
+## Pontuação
+
+| Situação | Pontos |
+|---|---|
+| Chegar no cérebro | +2 |
+| Ser o primeiro a chegar | +1 |
+| Outro zumbi morrer na sua armadilha | +1 por zumbi (só vale se alguém chegou) |
+| **Todos** chegaram | ninguém pontua ("Fácil demais!") |
+| Ninguém chegou | ninguém pontua |
+
+Quem fizer **10 pontos** primeiro vence (em caso de empate, joga-se mais uma rodada).
+
+Para a partida não travar:
+
+- Quando todos os humanos já morreram ou chegaram, os bots que sobraram têm no máximo **12 segundos** ("SÓ FALTAM OS BOTS!").
+- Se **ninguém chegou** na rodada, a próxima caixa de itens sempre traz uma **bomba** para abrir caminho
+  (os bots Médio e Difícil sabem mirar a bomba no que está bloqueando a passagem).
+
+## Jogadores e controles
+
+No lobby, cada jogador aperta CONFIRMAR para entrar e CONFIRMAR de novo para ficar pronto.
+A partida começa quando pelo menos 2 jogadores estão prontos. Funciona com qualquer combinação:
+2 no teclado (WASD + setas), 2 no teclado + 2 controles, 3 ou 4 controles, etc.
+
+| Ação | Teclado WASD | Teclado Setas | Controle |
+|---|---|---|---|
+| Andar / mover cursor | A/D (W/S no cursor) | Setas | Analógico esquerdo / D-pad |
+| Pular | W ou Espaço | Seta para cima | A |
+| Confirmar (entrar, pronto, pegar, colocar) | Espaço | Enter | A |
+| Girar item (anti-horário / horário) | Q / E | Ctrl direito / Shift direito | LB (ou X) / RB (ou Y) |
+| Trocar mapa (no lobby) | A / D | Esquerda / Direita | Analógico / D-pad |
+| Voltar / sair do lobby | Q | Backspace | B |
+| Pausar | Esc | Esc | Start |
+
+Com o jogo pausado: CONFIRMAR continua e VOLTAR sai para o lobby.
+O zumbi também desliza e pula na parede.
+
+O lobby e a tela de pausa mostram uma tabela com os controles de cada tipo de dispositivo (a coluna de quem
+está jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
+mostra os botões daquele jogador, e nas duas primeiras corridas aparece um lembrete de como pular.
+
+## Itens
+
+Todos os itens giram (menos a bomba): o giro muda a direção da mola, do canhão, do lança-chamas,
+do ventilador, da esteira e da serra móvel, e deixa a prancha ou os portais na vertical/horizontal.
+
+| Item | O que faz |
+|---|---|
+| Caixa | Bloco 1x1 |
+| Prancha | Plataforma 3x1 |
+| Pedra | Bloco 2x2 |
+| Gelo | Bloco 2x1 escorregadio |
+| Caixa Podre | Treme quando alguém pisa, some e volta 2,5 s depois |
+| Esteira | Plataforma 3x1 que empurra quem está em cima para um lado |
+| Mola | Arremessa o zumbi na direção para onde aponta |
+| Ventilador | Sopra os zumbis (4,5 células) na direção para onde aponta |
+| Portais | Você coloca dois (verde e roxo): quem entra num sai no outro |
+| Espinhos | Mata quem encostar nas pontas |
+| Serra | Mata quem encostar |
+| Serra Móvel | Serra que vai e volta num trilho de 3 células |
+| Canhão de Ossos | Atira um osso a cada 2,2 s durante a corrida |
+| Lança-Chamas | Cospe fogo (2,5 células) por 1,1 s, a cada 2,8 s |
+| Bomba | Explode tudo numa área 3x3 (não destrói pedra, trilhos e coisas do mapa) |
+
+Não dá para colocar itens nas áreas de largada e de chegada (aparecem marcadas no posicionamento).
+
+## Como abrir e jogar
+
+1. Abra a pasta `ZumbiHorse` pelo Unity Hub (Unity 6000.3.25f1).
+2. A cena `Assets/Scenes/Jogo.unity` abre sozinha na primeira vez. Aperte **Play**.
+   (O jogo também roda a partir de qualquer cena vazia: o `Bootstrap` cria o `GameManager`.)
+3. Para gerar executável: menu **Zumbi Horse > Build Linux**, **Build Windows** ou **Build WebGL (itch.io)**.
+   Cada um precisa do módulo daquela plataforma instalado no Unity Hub (Installs > engrenagem > Add modules);
+   se faltar, o menu avisa. Os builds vão para a pasta `Builds/` (ela não fica no git).
+
+## Publicar no itch.io
+
+1. Gere os builds (veja acima). O **WebGL** é o melhor para o itch.io: o jogo roda direto na página, sem baixar nada.
+   O menu já configura a compressão do jeito que o itch.io aceita (Gzip com "Decompression Fallback").
+2. Compacte cada build em um `.zip` (o conteúdo da pasta, não a pasta):
+   ```
+   cd Builds/WebGL && zip -r ../ZumbiHorse-web.zip . && cd -
+   cd Builds/Linux && zip -r ../ZumbiHorse-linux.zip . && cd -
+   cd Builds/Windows && zip -r ../ZumbiHorse-windows.zip . && cd -
+   ```
+3. Em https://itch.io/game/new: **Kind of project = HTML** (se for subir o WebGL) ou **Downloadable**.
+4. Em **Uploads**, envie os zips. No zip WebGL marque *"This file will be played in the browser"*;
+   nos outros marque a plataforma (Linux / Windows).
+5. Em **Embed options** (só WebGL): tamanho **1280 x 720**, marque **Fullscreen button** e
+   **Click to launch in fullscreen** se quiser.
+6. Escreva a descrição com os controles (a tabela acima), coloque capa e prints, e salve como **Draft** para testar.
+   Quando estiver bom, mude **Visibility** para **Public**.
+
+No navegador, clique no jogo antes de jogar (para ele receber o teclado). Controles também funcionam no navegador.
+
+O projeto usa o pacote **Input System** (necessário para vários controles ao mesmo tempo).
+Se copiar os scripts para outro projeto sem esse pacote, só os dois lados do teclado funcionam.
+
+## Estrutura
+
+Tudo (pixel art, sons, fase e interface) é gerado por código, sem nenhum asset externo.
+
+```
+Assets/
+  Scenes/Jogo.unity      câmera + GameManager
+  Scripts/
+    Bootstrap.cs         cria o GameManager se a cena não tiver um
+    Core/
+      GameInput.cs       InputSource: teclado WASD, teclado setas, controles (Input System)
+      Art.cs             pixel art procedural (zumbis, blocos, armadilhas, cenário)
+      Sfx.cs             efeitos sonoros sintetizados
+      FxParticle.cs      partículas, poeira, explosões
+      Spinner.cs         gira/balança/desliza objetos
+    Game/
+      GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
+      MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
+      Level.cs           monta a fase a partir do mapa, grade de ocupação, fundo
+      Train.cs           trem fantasma (vai e volta, carona no teto, pontas mortais)
+      Bots/              IA dos bots: NavGrid (mapa de navegação e simulação de pulos),
+                         BotPlayer (escolher, posicionar, correr), BotSystem (roda os bots)
+      Zombie.cs          controle de plataforma (pulo variável, coyote time, parede, gelo, molas)
+      PlayerCursor.cs    cursor de escolher/posicionar
+      GridObject.cs      objetos que ocupam células da grade
+      DemoDriver.cs      modo de teste automático com bots (só liga com -zumbiDemo)
+    Items/               definições, fábrica e comportamento dos itens
+  Editor/ZumbiSetup.cs   menu "Zumbi Horse": recriar cena e builds
+```
+
+Para ajustar a física do zumbi, mexa nas constantes no topo de `Zombie.cs`.
+Para mudar ou criar mapas, edite `MapDefs.cs`: cada mapa é um desenho de 18 linhas x 32 colunas
+(`#` terra, `S` pedra, `=` trilho, `a` ácido, `X` serra, `^` espinhos, `1-4` largada, `G` cérebro...),
+mais a lista de trens e serras móveis.
+Para mudar a pontuação, veja `WinScore` e `Points*` no topo de `GameManager.cs`.
+
+### Modo de teste automático
+
+O executável aceita `-zumbiDemo`: bots (a mesma IA do jogo) entram no lobby, jogam sozinhos e o jogo salva prints de cada fase.
+
+```
+./ZumbiHorse.x86_64 -screen-fullscreen 0 -zumbiDemo -zumbiBots 4 -zumbiRounds 2 -zumbiShots /tmp/prints
+```
+
+Outras opções: `-zumbiNoItems` (bots colocam itens fora do caminho), `-zumbiClumsy` (último bot nunca pula),
+`-zumbiWall` (paredão de pedra na frente da chegada: fase impossível), `-zumbiPauseShot` (print da tela de pausa),
+`-zumbiMute` (sem som),
+`-zumbiWin N` (pontos para vencer), `-zumbiMap N` (0 a 4 = mapa, 5 = aleatório),
+`-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots).
