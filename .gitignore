@@ -36,3 +36,6 @@
 sysinfo.txt
 crashlytics-build.properties
 .DS_Store
+
+# Gerados por builds interrompidos (pacote de testes de performance)
+/[Aa]ssets/[Rr]esources/PerformanceTestRun*

@@ -9,6 +9,8 @@ using UnityEngine;
 ///   -zumbiDemo [-zumbiBots 4] [-zumbiDiff 0|1|2|mix] [-zumbiRounds 2] [-zumbiShots pasta]
 ///   [-zumbiNoItems] [-zumbiClumsy] [-zumbiWin 10] [-zumbiMap 0-5] [-zumbiBox Portal,Esteira,...]
 ///   [-zumbiWall] [-zumbiPauseShot] [-zumbiMute]
+///   [-zumbiHostIp] (abre uma sala na rede local)   [-zumbiJoinIp 127.0.0.1] (entra nela com um jogador de teste)
+///   [-zumbiHostRelay] (abre uma sala com código)     [-zumbiJoinCode ABC123] (entra pelo código)
 /// Coloca bots (a IA de verdade) para jogar sozinhos e salva prints de cada fase.
 /// </summary>
 [DefaultExecutionOrder(-100)]
@@ -21,6 +23,10 @@ public class DemoDriver : MonoBehaviour
     int botCount = 4, maxRounds = 2;
     string diff = "1";
     bool clumsyLastBot, wall, pauseShot;
+    bool hostIp, hostRelay, hosted, connectedOnce;
+    string joinIp, joinCode;
+    InputSource tester;
+    float jumpHold;
 
     readonly HashSet<string> taken = new HashSet<string>();
     float clock, phaseClock, quitAt = -1f;
@@ -44,6 +50,10 @@ public class DemoDriver : MonoBehaviour
         d.wall = args.Contains("-zumbiWall");
         d.pauseShot = args.Contains("-zumbiPauseShot");
         if (args.Contains("-zumbiMute")) AudioListener.volume = 0f;
+        d.hostIp = args.Contains("-zumbiHostIp");
+        d.joinIp = Arg(args, "-zumbiJoinIp");
+        d.hostRelay = args.Contains("-zumbiHostRelay");
+        d.joinCode = Arg(args, "-zumbiJoinCode");
         if (int.TryParse(Arg(args, "-zumbiWin"), out int w)) GameManager.WinScore = Mathf.Max(1, w);
         if (int.TryParse(Arg(args, "-zumbiMap"), out int m)) gm.SetMap(m);
         var box = Arg(args, "-zumbiBox");
@@ -90,6 +100,15 @@ public class DemoDriver : MonoBehaviour
             if (gm.Phase == Phase.Pick && gm.Round == 1 && wall) BuildWall();
         }
         phaseClock += dt;
+
+        if (joinIp != null || joinCode != null) { UpdateClient(); return; }
+        if ((hostIp || hostRelay) && !hosted && clock > 1f)
+        {
+            hosted = true;
+            GameManager.AllowBotsOnly = false; // espera o jogador que vem pela rede
+            if (hostRelay) NetGame.Instance.HostRelay();
+            else NetGame.Instance.HostIp();
+        }
 
         string tag = $"r{gm.Round}_";
         switch (gm.Phase)
@@ -140,6 +159,75 @@ public class DemoDriver : MonoBehaviour
 
         if (clock > 400f && quitAt < 0f) quitAt = clock;
         if (quitAt >= 0f && clock >= quitAt) Quit();
+    }
+
+    /// <summary>
+    /// -zumbiJoinIp: entra na sala e joga com um dispositivo de mentira (aperta CONFIRMAR para entrar e escolher,
+    /// corre para a direita pulando), para testar o caminho todo do online. Sai quando o host fecha.
+    /// </summary>
+    void UpdateClient()
+    {
+        var net = NetGame.Instance;
+        if (net.Mode != NetMode.Client)
+        {
+            if (tester == null && clock > 1.5f)
+            {
+                tester = NetGame.TestDevice = new InputSource { Kind = DeviceKind.Bot };
+                if (joinCode != null) net.JoinRelay(joinCode);
+                else net.JoinIp(joinIp);
+            }
+            if (net.Mode == NetMode.Offline && tester != null && (connectedOnce || clock > 30f) && quitAt < 0f)
+            {
+                Debug.Log(connectedOnce ? "[Demo] host fechou a sala" : "[Demo] não conectou");
+                quitAt = clock + 0.5f;
+            }
+            if (quitAt >= 0f && clock >= quitAt) Quit();
+            return;
+        }
+        if (!connectedOnce) Debug.Log("[Demo] cliente conectado");
+        connectedOnce = true;
+
+        string tag = $"cli_r{gm.Round}_";
+        float t = phaseClock;
+        bool every(float period) => Mathf.Repeat(t, period) < dt();
+        float dt() => Time.unscaledDeltaTime;
+        tester.BotMove = Vector2.zero;
+        jumpHold -= dt();
+        tester.BotJumpHeld = jumpHold > 0f;
+        switch (gm.Phase)
+        {
+            case Phase.Lobby:
+                if (t > 3f) Shot("cli_01_lobby");
+                if (every(1.2f)) tester.BotConfirmFrame = Time.frameCount; // entra e fica pronto
+                break;
+            case Phase.Pick:
+                if (t > 0.6f) Shot(tag + "03_escolha");
+                // sobe até a fileira de itens e varre de um lado para o outro apertando CONFIRMAR
+                if (t < 0.4f) tester.BotMove = Vector2.up;
+                else tester.BotMove = new Vector2(Mathf.Sign(Mathf.Sin((t - 0.4f) * 1.6f)) * 0.5f, 0f);
+                if (t > 0.4f && every(0.15f)) tester.BotConfirmFrame = Time.frameCount;
+                break;
+            case Phase.Place:
+                if (t > 1.2f) Shot(tag + "04_posicionar");
+                tester.BotMove = new Vector2(Mathf.Sin(t * 1.3f), Mathf.Cos(t * 0.9f)) * 0.6f;
+                if (every(0.6f)) tester.BotConfirmFrame = Time.frameCount;
+                break;
+            case Phase.Run:
+                if (t > 0.5f) Shot(tag + "05_corrida_inicio");
+                if (t > 2.5f) Shot(tag + "06_corrida");
+                tester.BotMove = Vector2.right;
+                if (every(0.9f)) { tester.BotJumpFrame = Time.frameCount; jumpHold = 0.35f; tester.BotJumpHeld = true; }
+                break;
+            case Phase.RoundEnd:
+                if (t > 0.4f) Shot(tag + "07_fim_rodada");
+                break;
+            case Phase.Score:
+                if (t > 2f) Shot(tag + "08_placar");
+                break;
+            case Phase.Victory:
+                if (t > 2.5f) Shot("cli_09_vitoria");
+                break;
+        }
     }
 
     /// <summary>-zumbiWall: paredão de pedra na frente da chegada (fase impossível, para testar bots empacados).</summary>

@@ -92,9 +92,29 @@ public static class Level
         foreach (var t in map.Trains)
         {
             Train.Create(t, Root);
-            TrainZones.Add(new RectInt(t.FromX, t.TrackRow + 1, t.ToX - t.FromX + 1, 2));
+            TrainZones.Add(TrainZone(t));
         }
         foreach (var s in map.Saws) CreateMovingSaw(s);
+    }
+
+    /// <summary>Só os dados da fase (nome, largada, chegada, trilhos), sem criar nada: usado pelo cliente online.</summary>
+    public static void LoadInfo(MapDef map)
+    {
+        Map = map;
+        FindMarkers(map);
+        TrainZones.Clear();
+        foreach (var t in map.Trains) TrainZones.Add(TrainZone(t));
+    }
+
+    static RectInt TrainZone(TrainDef t) => new RectInt(t.FromX, t.TrackRow + 1, t.ToX - t.FromX + 1, 2);
+
+    /// <summary>Apaga a fase e o fundo (o cliente online só desenha o que o host manda).</summary>
+    public static void ClearAll()
+    {
+        Clear();
+        if (background != null) Object.Destroy(background.gameObject);
+        background = null;
+        backgroundTheme = -1;
     }
 
     public static void Clear()

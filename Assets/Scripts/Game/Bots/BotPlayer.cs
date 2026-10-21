@@ -612,7 +612,8 @@ public class BotPlayer
     {
         var train = z.GroundTrain;
         Vector2 pos = z.Position;
-        float tx = hasRideTarget ? rideTargetX : Level.GoalPosition.x;
+        if (!hasRideTarget) { rideTargetX = ExitTarget(sys.Nav, pos); hasRideTarget = true; } // subiu sem querer
+        float tx = rideTargetX;
         int dir = tx >= pos.x ? 1 : -1;
 
         if (Mathf.Abs(tx - pos.x) < 5.5f && !NeverJump)
@@ -627,10 +628,30 @@ public class BotPlayer
                 return;
             }
         }
-        // anda no teto para o lado do destino (sem cair), ou fica parado se o trem já está levando
-        float endX = dir > 0 ? train.RightX - 0.5f : train.LeftX + 0.5f;
-        bool trainHelps = train.Velocity.x * dir > 0.1f;
-        inp.BotMove.x = trainHelps ? 0f : NavGrid.GroundSteer(endX - pos.x, z.Velocity.x - train.Velocity.x, false);
+        // vai para a ponta da frente do teto (longe do para-choque): quando o trem chegar no fim, o pulo de saída é curto
+        float endX = dir > 0 ? train.RightX - 0.7f : train.LeftX + 0.7f;
+        inp.BotMove.x = NavGrid.GroundSteer(endX - pos.x, z.Velocity.x - train.Velocity.x, false);
+    }
+
+    /// <summary>Onde descer do trem: um lugar ao lado da pista em que ele está que tenha caminho até o cérebro (o mais curto).</summary>
+    static float ExitTarget(NavGrid nav, Vector2 pos)
+    {
+        var at = NavGrid.NodeAt(pos);
+        float best = float.MaxValue, x = Level.GoalPosition.x;
+        foreach (var zone in Level.TrainZones)
+        {
+            if (at.x < zone.xMin - 1 || at.x > zone.xMax || Mathf.Abs(at.y - (zone.yMin + 1)) > 3) continue;
+            foreach (var n in nav.Nodes)
+            {
+                if (zone.Contains(n) || n.y < zone.yMin - 1 || n.y > zone.yMin + 3) continue;
+                if (!(n.x >= zone.xMin - 2 && n.x < zone.xMin) && !(n.x > zone.xMax - 1 && n.x <= zone.xMax + 1)) continue;
+                var path = nav.FindPath(n);
+                if (path.Count == 0 && !nav.GoalNodes.Contains(n)) continue;
+                float cost = path.Sum(e => e.Cost);
+                if (cost < best) { best = cost; x = NavGrid.NodeFeet(n).x; }
+            }
+        }
+        return x;
     }
 
     /// <summary>

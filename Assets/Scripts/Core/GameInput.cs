@@ -8,7 +8,7 @@ public enum DeviceKind { Keyboard1, Keyboard2, Gamepad, Bot }
 
 /// <summary>
 /// Fonte de input de um jogador: metade esquerda do teclado (WASD), metade direita (setas),
-/// um controle ou um bot (usado apenas pelo modo demo de testes).
+/// um controle, um bot, ou (no multiplayer online) um desses dispositivos em outro computador.
 /// </summary>
 public class InputSource
 {
@@ -22,6 +22,21 @@ public class InputSource
     public Vector2 BotMove;
     public bool BotJumpHeld;
     public int BotJumpFrame = -1, BotConfirmFrame = -1, BotRotateFrame = -1, BotRotateCCWFrame = -1;
+
+    // Dispositivo de outro computador (multiplayer online). Kind diz qual é o dispositivo de lá.
+    public bool Remote;
+    public int RemoteConn, RemoteId;
+    public bool RemoteAlive = true;
+    public Vector2 RemoteMove;
+    public bool RemoteJumpHeld;
+    /// <summary>Quadro em que cada botão foi apertado lá: pulo, confirmar, voltar, girar horário, anti-horário, pausar.</summary>
+    public readonly int[] RemotePressFrame = { -1, -1, -1, -1, -1, -1 };
+    public const int BtnJump = 0, BtnConfirm = 1, BtnBack = 2, BtnCW = 3, BtnCCW = 4, BtnPause = 5;
+
+    bool RemoteDown(int b) => RemotePressFrame[b] == Time.frameCount;
+
+    /// <summary>Dispositivos dos computadores conectados (só no host).</summary>
+    public static readonly List<InputSource> RemoteDevices = new List<InputSource>();
 
     const float DeadZone = 0.3f;
 
@@ -42,7 +57,8 @@ public class InputSource
     /// <summary>Mesmo dispositivo físico (usado para não deixar o mesmo controle entrar duas vezes).</summary>
     public bool SameDevice(InputSource other)
     {
-        if (other == null || other.Kind != Kind) return false;
+        if (other == null || other.Kind != Kind || other.Remote != Remote) return false;
+        if (Remote) return other.RemoteConn == RemoteConn && other.RemoteId == RemoteId;
 #if ENABLE_INPUT_SYSTEM
         if (Kind == DeviceKind.Gamepad) return other.Pad == Pad;
 #endif
@@ -53,6 +69,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteAlive;
 #if ENABLE_INPUT_SYSTEM
             if (Kind == DeviceKind.Gamepad) return Pad != null && Pad.added;
 #endif
@@ -64,6 +81,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return Vector2.ClampMagnitude(RemoteMove, 1f);
             Vector2 v = Vector2.zero;
             switch (Kind)
             {
@@ -98,6 +116,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteJumpHeld;
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Held(K.W) || Held(K.Space);
@@ -112,6 +131,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteDown(BtnJump);
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Down(K.W) || Down(K.Space);
@@ -127,6 +147,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteDown(BtnConfirm);
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Down(K.Space);
@@ -142,6 +163,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteDown(BtnCW);
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Down(K.E);
@@ -157,6 +179,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteDown(BtnCCW);
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Down(K.Q);
@@ -200,6 +223,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteDown(BtnBack);
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Down(K.Q);
@@ -214,6 +238,7 @@ public class InputSource
     {
         get
         {
+            if (Remote) return RemoteDown(BtnPause);
             switch (Kind)
             {
                 case DeviceKind.Keyboard1:
@@ -226,7 +251,11 @@ public class InputSource
 
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape }
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O }
+
+    /// <summary>Tecla O: abre/fecha o painel online.</summary>
+    public static bool OnlineKeyDown => Down(K.O);
+    public static bool EscapeKeyDown => Down(K.Escape);
 
 #if ENABLE_INPUT_SYSTEM
     static UnityEngine.InputSystem.Key Map(K k)
@@ -250,6 +279,7 @@ public class InputSource
             case K.RightCtrl: return UnityEngine.InputSystem.Key.RightCtrl;
             case K.RightShift: return UnityEngine.InputSystem.Key.RightShift;
             case K.Backspace: return UnityEngine.InputSystem.Key.Backspace;
+            case K.O: return UnityEngine.InputSystem.Key.O;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -297,6 +327,7 @@ public class InputSource
             case K.RightCtrl: return KeyCode.RightControl;
             case K.RightShift: return KeyCode.RightShift;
             case K.Backspace: return KeyCode.Backspace;
+            case K.O: return KeyCode.O;
             default: return KeyCode.Escape;
         }
     }
@@ -333,6 +364,7 @@ public class InputSource
             list.Add(src);
         }
 #endif
+        foreach (var r in RemoteDevices) if (r.RemoteAlive) list.Add(r);
         return list;
     }
 

@@ -45,8 +45,12 @@ public static class Sfx
         Add("join", 0.3f, t => Square(Arp(t, 0.07f, 392, 523, 659, 784), t) * Env(t, 0.3f) * 0.25f);
     }
 
+    /// <summary>Avisado a cada som tocado (o host do multiplayer online repassa para os clientes).</summary>
+    public static event Action<string, float, float> Played;
+
     public static void Play(string name, float volume = 1f, float pitch = 1f)
     {
+        Played?.Invoke(name, volume, pitch);
         if (source == null || !clips.TryGetValue(name, out var clip)) return;
         source.pitch = pitch;
         source.PlayOneShot(clip, volume);

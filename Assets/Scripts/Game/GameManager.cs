@@ -21,6 +21,13 @@ public class PlayerSlot
     public int Kills;
     public readonly List<KeyValuePair<string, int>> RoundPoints = new List<KeyValuePair<string, int>>();
 
+    // O que a interface mostra. No host vem dos objetos (RefreshViews); no cliente online vem da rede.
+    public ZombieState? ZombieView;
+    public Vector2 ZombiePos;
+    public Vector2? CursorView;
+    public ItemType? HeldView;
+    public bool HeldSecondPortal;
+
     public Color Color => Art.PlayerColors[Index % 4];
     public string Name => "P" + (Index + 1);
     public string FullName => IsBot ? Name + " (CPU)" : Name;
@@ -30,13 +37,14 @@ public class PlayerSlot
 /// Controla a partida no estilo Ultimate Chicken Horse:
 /// Lobby → Escolha de item → Posicionamento → Corrida até o cérebro → Placar → ... → Vitória.
 /// Toda a interface é desenhada com IMGUI (OnGUI) para o projeto não depender de prefabs.
+/// A parte do multiplayer online fica em GameManager.Net.cs.
 /// </summary>
-public class GameManager : MonoBehaviour
+public partial class GameManager : MonoBehaviour
 {
     /// <summary>Pontos para vencer a partida.</summary>
     public static int WinScore = 10;
     public const int MaxPlayers = 4;
-    const float PlaceTime = 30f, RunTime = 75f;
+    const float PickTime = 20f, PlaceTime = 30f, RunTime = 75f;
     /// <summary>Quando todos os humanos já morreram ou chegaram, os bots têm no máximo este tempo.</summary>
     const float BotsOnlyTime = 12f;
     const int PointsGoal = 2, PointsFirst = 1, PointsTrap = 1;
@@ -67,7 +75,7 @@ public class GameManager : MonoBehaviour
     static readonly Vector2 BoxCenter = new Vector2(0f, 0.5f);
     const float BoxSpacing = 3.6f;
 
-    float placeTimer, runTimer, doneTimer = -1f;
+    float pickTimer, placeTimer, runTimer, doneTimer = -1f;
     bool timeUp, botsOnly;
     bool nobodyLastRound;   // ninguém chegou na rodada anterior: a próxima caixa traz uma bomba
     readonly List<int> finishOrder = new List<int>();
@@ -100,6 +108,7 @@ public class GameManager : MonoBehaviour
         SetupCamera();
         Sfx.Init(gameObject);
         gameObject.AddComponent<BotSystem>();
+        gameObject.AddComponent<NetGame>();
         Level.Build(Maps.All[0]);
         DemoDriver.TryAttach(this);
     }
@@ -141,6 +150,8 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
+        HandleOnlineKeys();
+        if (Replica) { ReplicaUpdate(); return; }
         if (HandlePause()) return;
         if (paused) return;
 
@@ -169,7 +180,7 @@ public class GameManager : MonoBehaviour
     bool HandlePause()
     {
         if (Phase == Phase.Lobby) return false;
-        var devices = InputSource.AvailableDevices();
+        var devices = ActiveDevices();
         bool toggle = devices.Any(d => d.PauseDown);
         if (paused)
         {
@@ -221,7 +232,7 @@ public class GameManager : MonoBehaviour
 
     void UpdateLobby()
     {
-        var devices = InputSource.AvailableDevices();
+        var devices = ActiveDevices();
         foreach (var d in devices)
         {
             if (!d.ConfirmDown || Players.Any(p => p.Input.SameDevice(d))) continue;
@@ -257,7 +268,7 @@ public class GameManager : MonoBehaviour
         foreach (var p in Players.ToList())
         {
             if (!p.Input.Connected) { Players.Remove(p); continue; }
-            if (p.JoinFrame == Time.frameCount) continue;
+            if (p.JoinFrame == Time.frameCount || !Listening(p.Input)) continue;
             if (p.Input.ConfirmDown && !p.Ready)
             {
                 p.Ready = true;
@@ -282,8 +293,9 @@ public class GameManager : MonoBehaviour
             if (lobbyCountdown <= 0f) StartMatch();
         }
 
-#if !UNITY_EDITOR
-        if (devices.Count > 0 && devices[0].PauseDown) Application.Quit();
+#if !UNITY_EDITOR && !UNITY_WEBGL
+        if (devices.Count > 0 && devices[0].Kind == DeviceKind.Keyboard1 && !devices[0].Remote && devices[0].PauseDown &&
+            NetGame.Instance.Mode == NetMode.Offline) Application.Quit();
 #endif
     }
 
@@ -355,6 +367,7 @@ public class GameManager : MonoBehaviour
             p.RoundPoints.Clear();
         }
 
+        pickTimer = PickTime;
         int count = Players.Count + 2;
         var types = new List<ItemType>();
         while (types.Count < count)
@@ -454,6 +467,22 @@ public class GameManager : MonoBehaviour
             Sfx.Play("pick");
             Fx.Burst((Vector2)h.transform.position + h.RotatedCenter, p.Color, 12, 5f, 0.14f, 4f);
         }
+
+        // acabou o tempo (alguém distraído, principalmente no online): ganha um item qualquer que sobrou
+        pickTimer -= Time.deltaTime;
+        if (pickTimer <= 0f)
+            foreach (var p in Players.Where(p => !p.Picked))
+            {
+                var free = boxItems.Where(it => it != null && it.Owner < 0).ToList();
+                if (free.Count == 0) break;
+                var it = free[Random.Range(0, free.Count)];
+                it.Owner = p.Index;
+                p.Item = it;
+                p.Picked = true;
+                if (p.Cursor != null) p.Cursor.SetVisible(false);
+                it.SetTint(new Color(0.65f, 0.65f, 0.65f, 1f));
+                Sfx.Play("pick");
+            }
 
         float pulse = 1.1f + Mathf.Sin(Time.time * 10f) * 0.04f;
         foreach (var it in boxItems)
@@ -726,6 +755,7 @@ public class GameManager : MonoBehaviour
     void AddFloat(Vector2 pos, string text, Color color, int size, float duration)
     {
         floats.Add(new FloatText { Pos = pos, Text = text, Color = color, Size = size, Start = Time.time, Duration = duration });
+        FloatAdded?.Invoke(pos, text, color, size, duration);
     }
 
     // ================================================================== interface (IMGUI)
@@ -793,10 +823,11 @@ public class GameManager : MonoBehaviour
             style.richText = false;
         }
 
+        if (!Replica) RefreshViews();
         switch (Phase)
         {
             case Phase.Lobby: DrawLobby(); break;
-            case Phase.Pick: DrawTopBar("ESCOLHA UM ITEM", -1f); DrawPick(); break;
+            case Phase.Pick: DrawTopBar("ESCOLHA UM ITEM", pickTimer); DrawPick(); break;
             case Phase.Place: DrawTopBar("POSICIONE SEU ITEM", placeTimer); DrawPlace(); break;
             case Phase.Run: DrawTopBar("CORRA ATÉ O CÉREBRO!", runTimer); DrawRun(); break;
             case Phase.RoundEnd: DrawTopBar("", -1f); DrawRun(); DrawRoundEnd(); break;
@@ -813,6 +844,7 @@ public class GameManager : MonoBehaviour
         }
 
         if (paused) DrawPause();
+        DrawOnline();
     }
 
     // ------------------------------------------------------------------ teclas e botões desenhados
@@ -1002,7 +1034,8 @@ public class GameManager : MonoBehaviour
 
         float wob = Mathf.Sin(Time.time * 2f) * 4f;
         Text(R(0, 12 + wob, VW, 100), "ULTIMATE ZUMBI HORSE", 82, new Color(0.55f, 0.92f, 0.4f));
-        Text(R(0, 104, VW, 36), "Monte a fase, arme as armadilhas e seja o único zumbi a comer o cérebro!", 24, new Color(0.9f, 0.85f, 1f));
+        if (!DrawOnlineBanner(R(0, 102, VW, 40)))
+            Text(R(0, 104, VW, 36), "Monte a fase, arme as armadilhas e seja o único zumbi a comer o cérebro!", 24, new Color(0.9f, 0.85f, 1f));
 
         DrawMapSelector(148f);
 
@@ -1050,7 +1083,7 @@ public class GameManager : MonoBehaviour
             int f = slot.Ready ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
             float hop = slot.Ready ? Mathf.Abs(Mathf.Sin(Time.time * 8f)) * 10f : 0f;
             DrawSprite(new Rect(sprite.x, sprite.y - hop * S, sprite.width, sprite.height), frames[f], Color.white, slot.Ready && (int)(Time.time * 2f) % 2 == 0);
-            Text(R(x, y0 + 190, cw, 34), slot.Input.Label, 24, new Color(0.85f, 0.85f, 0.9f));
+            Text(R(x, y0 + 190, cw, 34), DeviceLabel(slot), 24, new Color(0.85f, 0.85f, 0.9f));
             if (slot.Ready)
             {
                 Text(R(x, y0 + 228, cw, 48), "PRONTO!", 40, new Color(0.5f, 1f, 0.45f));
@@ -1067,7 +1100,7 @@ public class GameManager : MonoBehaviour
         string status;
         Color sc = new Color(1f, 1f, 1f);
         if (Players.Count < 2) status = "Precisa de pelo menos 2 jogadores (pode ser bot: aperte CIMA)";
-        else if (!Players.Any(p => !p.IsBot) && !AllowBotsOnly) status = "Pelo menos um humano precisa entrar";
+        else if (!Players.Any(p => !p.IsBot) && !BotsOnlyAllowed) status = "Pelo menos um humano precisa entrar";
         else if (lobbyCountdown > 0f) { status = $"Começando em {Mathf.CeilToInt(lobbyCountdown)}..."; sc = new Color(0.5f, 1f, 0.45f); }
         else status = "Esperando todo mundo ficar pronto...";
         Text(R(0, 636, VW, 48), status, 34, sc);
@@ -1079,7 +1112,7 @@ public class GameManager : MonoBehaviour
         Keys(R(0, y, VW, 32), "BOTS:  [W] [^] ou CIMA adiciona  •  [S] [v] ou BAIXO tira  •  [E] [SHIFT] {RB} muda a dificuldade do último", 17, hint);
         Text(R(0, y + 32, VW, 28), $"Primeiro a fazer {WinScore} pontos vence.  Chegar no cérebro: +{PointsGoal}  •  Primeiro: +{PointsFirst}  •  Matar com sua armadilha: +{PointsTrap}  •  Se todos chegarem, ninguém pontua!", 18, new Color(0.65f, 0.95f, 0.6f));
         string pads = InputSource.GamepadsSupported ? $"Controles conectados: {InputSource.GamepadCount}" : "Input System não ativo: só teclado";
-        Keys(R(0, y + 60, VW, 26), pads + "   •   [ESC] {START} pausar (na partida)", 15, new Color(0.6f, 0.6f, 0.66f));
+        Keys(R(0, y + 60, VW, 26), pads + "   •   [ESC] {START} pausar (na partida)   •   [O] jogar online", 15, new Color(0.6f, 0.6f, 0.66f));
     }
 
     void DrawMapSelector(float y)
@@ -1171,7 +1204,7 @@ public class GameManager : MonoBehaviour
             string st = "";
             if (Phase == Phase.Pick) st = p.Picked ? "pronto" : "";
             else if (Phase == Phase.Place) st = p.Placed ? "pronto" : "";
-            else if (p.Zombie != null) st = p.Zombie.State == ZombieState.Finished ? "chegou" : p.Zombie.State == ZombieState.Dead ? "morreu" : "";
+            else if (p.ZombieView.HasValue) st = p.ZombieView == ZombieState.Finished ? "chegou" : p.ZombieView == ZombieState.Dead ? "morreu" : "";
             Text(R(x + 16, y, chipW - 20, 40), $"{p.Name}{(p.IsBot ? " CPU" : "")}  {p.Score} pts", 22, p.Color, TextAnchor.MiddleLeft);
             Text(R(x, y, chipW - 12, 40), st, 18, st == "morreu" ? new Color(1f, 0.5f, 0.45f) : new Color(0.6f, 1f, 0.5f), TextAnchor.MiddleRight);
         }
@@ -1182,12 +1215,11 @@ public class GameManager : MonoBehaviour
 
     void DrawPick()
     {
-        int count = boxItems.Count;
+        int count = boxView.Count;
         WorldText(BoxCenter + new Vector2(0f, 3.25f), "A CAIXA DE ITENS", 34, new Color(0.85f, 0.7f, 1f));
         for (int i = 0; i < count; i++)
         {
-            var it = boxItems[i];
-            if (it == null) continue;
+            var it = boxView[i];
             Vector2 slot = BoxSlot(i, count);
             if (it.Owner >= 0)
             {
@@ -1196,11 +1228,12 @@ public class GameManager : MonoBehaviour
             }
             else
             {
-                WorldText(slot + new Vector2(0f, -1.5f), it.Def.Name, 22, Color.white);
-                WorldText(slot + new Vector2(0f, -1.95f), it.Def.Hint, 16, new Color(0.7f, 0.7f, 0.78f));
+                var def = ItemDefs.Get(it.Type);
+                WorldText(slot + new Vector2(0f, -1.5f), def.Name, 22, Color.white);
+                WorldText(slot + new Vector2(0f, -1.95f), def.Hint, 16, new Color(0.7f, 0.7f, 0.78f));
             }
         }
-        if (nobodyLastRound && boxItems.Any(it => it != null && it.Def.Type == ItemType.Bomba))
+        if (nobodyLastRound && boxView.Any(it => it.Type == ItemType.Bomba))
             Text(R(0, 122, VW, 40), "Ninguém chegou na rodada passada: tem uma BOMBA na caixa para abrir caminho!", 24, new Color(1f, 0.7f, 0.35f));
         DrawCursorTags(false);
         DrawBottomHelp($"Mova o cursor até um item e aperte  {AnyConfirm}  para pegá-lo");
@@ -1234,15 +1267,16 @@ public class GameManager : MonoBehaviour
     {
         foreach (var p in Players)
         {
-            if (p.Cursor == null || (Phase == Phase.Pick && p.Picked) || (Phase == Phase.Place && p.Placed)) continue;
-            var g = ToGui(p.Cursor.Position);
+            if (!p.CursorView.HasValue || (Phase == Phase.Pick && p.Picked) || (Phase == Phase.Place && p.Placed)) continue;
+            var g = ToGui(p.CursorView.Value);
             string label = p.Name;
             string keys = $"{ConfirmKey(p.Input)} pegar";
-            if (withItem && p.Item != null)
+            if (withItem && p.HeldView.HasValue)
             {
-                string itemName = p.Item.Def.Type == ItemType.Portal ? (p.PortalFirst == null ? "Portal 1 de 2" : "Portal 2 de 2") : p.Item.Def.Name;
+                var def = ItemDefs.Get(p.HeldView.Value);
+                string itemName = def.Type == ItemType.Portal ? (p.HeldSecondPortal ? "Portal 2 de 2" : "Portal 1 de 2") : def.Name;
                 label = $"{p.Name} · {itemName}";
-                keys = $"{ConfirmKey(p.Input)} colocar" + (p.Item.Def.CanRotate ? $"   {RotateKey(p.Input)} girar" : "");
+                keys = $"{ConfirmKey(p.Input)} colocar" + (def.CanRotate ? $"   {RotateKey(p.Input)} girar" : "");
             }
             Text(new Rect(g.x + 22 * S, g.y + 18 * S, 400 * S, 30 * S), label, 22, p.Color, TextAnchor.UpperLeft);
             if (!p.IsBot) Keys(new Rect(g.x + 22 * S, g.y + 48 * S, 600 * S, 28 * S), keys, 15, new Color(1f, 0.9f, 0.55f), TextAnchor.MiddleLeft);
@@ -1261,9 +1295,8 @@ public class GameManager : MonoBehaviour
     {
         foreach (var p in Players)
         {
-            var z = p.Zombie;
-            if (z == null || z.State != ZombieState.Alive) continue;
-            WorldText(z.Position + new Vector2(0f, 1.55f), p.Name, 20, p.Color);
+            if (p.ZombieView != ZombieState.Alive) continue;
+            WorldText(p.ZombiePos + new Vector2(0f, 1.55f), p.Name, 20, p.Color);
         }
         if (Phase == Phase.Run && PhaseTime < 1.1f)
         {

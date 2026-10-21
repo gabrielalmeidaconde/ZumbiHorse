@@ -30,7 +30,7 @@ public class BotSystem : MonoBehaviour
     void Update()
     {
         var gm = GameManager.Instance;
-        if (gm == null || Time.timeScale == 0f) return;
+        if (gm == null || gm.Replica || Time.timeScale == 0f) return; // no cliente online os bots rodam no host
 
         bool anyBot = false;
         foreach (var p in gm.Players) if (p.IsBot) { anyBot = true; break; }

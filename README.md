@@ -1,11 +1,11 @@
 # Ultimate Zumbi Horse
 
 Versão simples de **Ultimate Chicken Horse** com zumbis, feita em **Unity 6 (6000.3.25f1)**.
-Para 2 a 4 jogadores no mesmo computador.
+Para 2 a 4 jogadores no mesmo computador ou **online** (veja [Multiplayer online](#multiplayer-online)).
 
 Cada rodada tem três fases:
 
-1. **Caixa de itens**: cada jogador escolhe um item com o seu cursor.
+1. **Caixa de itens**: cada jogador escolhe um item com o seu cursor (20 s; quem não escolher ganha um item que sobrou).
 2. **Posicionamento**: todos colocam o item na fase ao mesmo tempo (blocos para ajudar, armadilhas para atrapalhar).
 3. **Corrida**: todos os zumbis correm da largada até o **cérebro**. Quem morre fica fora da rodada.
 
@@ -100,6 +100,48 @@ O lobby e a tela de pausa mostram uma tabela com os controles de cada tipo de di
 está jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
 mostra os botões daquele jogador, e nas duas primeiras corridas aparece um lembrete de como pular.
 
+## Multiplayer online
+
+Aperte **O** no lobby para abrir o painel **JOGAR ONLINE**:
+
+- **Criar sala**: o jogo gera um **código** (ex.: `K7QF2M`). Passe para os amigos.
+- **Entrar com código**: digite o código e aperte Enter. Funciona pela internet e também na versão do navegador (itch.io).
+- **Rede local**: criar sala / entrar pelo IP de quem criou (mesmo Wi-Fi, sem internet; não funciona no navegador).
+
+Quem entra na sala vê o lobby do host e cada teclado ou controle daquele computador entra apertando CONFIRMAR,
+como se estivesse no mesmo PC (dá para misturar: 2 no host + 2 em outro computador). No máximo 4 jogadores e
+4 computadores. Se alguém cair no meio da partida, o zumbi dele vira CPU (Médio) e a partida continua.
+
+Como funciona: o host roda o jogo de verdade (física, bots, pontuação). Os outros computadores mandam os botões
+dos seus dispositivos (60 vezes por segundo) e recebem de volta, 20 vezes por segundo, o que mudou na tela
+(cada sprite: qual é, posição, rotação, escala, cor), o estado da interface, os sons e os textos.
+Usa uns 10 KB/s por computador conectado.
+
+### Antes de usar o código de sala (uma vez só)
+
+O código usa o **Unity Relay**, um serviço da Unity (grátis para jogos pequenos). Ele só funciona depois que o
+projeto é ligado a um projeto do Unity Cloud:
+
+1. Abra o projeto no Unity (6000.3.25f1) já logado na sua conta Unity.
+2. **Edit > Project Settings > Services**: em **Organization** escolha a sua organização, marque
+   **Create a new cloud project** (ou **Use an existing cloud project** e escolha um) e clique no botão de baixo
+   (**Link Unity project to cloud project** / criar projeto). Se a lista de organizações vier vazia, entre na sua
+   conta Unity no editor e clique em **Refresh**.
+3. Em https://cloud.unity.com, abra o projeto e procure **Relay** (em Multiplayer / Products). Se ele pedir para
+   ativar, ative.
+4. Gere os builds de novo (menu **Zumbi Horse**). O ID do projeto vai dentro do build, então builds antigos não servem.
+
+Enquanto isso não for feito, "Criar sala" mostra o aviso de que o build não está ligado ao Unity Cloud.
+A rede local funciona sem nada disso.
+
+Observações:
+
+- Redes de faculdade e de empresa às vezes bloqueiam o Relay (UDP) ou isolam os aparelhos do Wi-Fi uns dos outros
+  (aí a rede local não funciona). A versão do navegador usa WebSocket seguro, que costuma passar nesses bloqueios.
+- Host e clientes precisam da mesma versão do jogo (senão o host recusa a conexão e avisa).
+- O código de sala usa WebSocket seguro (como um site). Se no jogo baixado não conectar, teste abrir os dois
+  jogos com `-relayDtls` (usa UDP, o padrão da Unity). A versão do navegador sempre usa WebSocket.
+
 ## Itens
 
 Todos os itens giram (menos a bomba): o giro muda a direção da mola, do canhão, do lança-chamas,
@@ -174,6 +216,7 @@ Assets/
       Spinner.cs         gira/balança/desliza objetos
     Game/
       GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
+      GameManager.Net.cs modo cópia do cliente online, estado da interface pela rede, painel online
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
       Level.cs           monta a fase a partir do mapa, grade de ocupação, fundo
       Train.cs           trem fantasma (vai e volta, carona no teto, pontas mortais)
@@ -184,6 +227,8 @@ Assets/
       GridObject.cs      objetos que ocupam células da grade
       DemoDriver.cs      modo de teste automático com bots (só liga com -zumbiDemo)
     Items/               definições, fábrica e comportamento dos itens
+    Net/                 multiplayer online: NetTransport (Unity Transport + Relay ou IP), NetGame (salas,
+                         botões remotos, envio do estado), SceneSync (cópia da cena no cliente)
   Editor/ZumbiSetup.cs   menu "Zumbi Horse": recriar cena e builds
 ```
 
@@ -203,6 +248,8 @@ O executável aceita `-zumbiDemo`: bots (a mesma IA do jogo) entram no lobby, jo
 
 Outras opções: `-zumbiNoItems` (bots colocam itens fora do caminho), `-zumbiClumsy` (último bot nunca pula),
 `-zumbiWall` (paredão de pedra na frente da chegada: fase impossível), `-zumbiPauseShot` (print da tela de pausa),
-`-zumbiMute` (sem som),
+`-zumbiMute` (sem som), `-zumbiHostIp` (abre uma sala na rede local) e `-zumbiJoinIp 127.0.0.1` (entra nela com um
+jogador de teste que aperta os botões sozinho). Para testar o online sem abrir janelas, rode os dois com
+`-batchmode -nographics`; o log mostra o tráfego e quantos sprites o cliente está copiando.
 `-zumbiWin N` (pontos para vencer), `-zumbiMap N` (0 a 4 = mapa, 5 = aleatório),
 `-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots).

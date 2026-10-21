@@ -132,6 +132,61 @@ public static class Art
         return s;
     }
 
+    /// <summary>
+    /// Recria um sprite a partir do nome (a chave do cache). Usado no multiplayer online: o host manda só o nome
+    /// do sprite e o cliente gera a mesma imagem. Devolve null se o nome não for conhecido.
+    /// </summary>
+    public static Sprite FromKey(string key)
+    {
+        if (cache.TryGetValue(key, out var s) && s != null) return s;
+        var p = key.Split('_');
+        int I(int i) => i < p.Length && int.TryParse(p[i], out int v) ? v : 0;
+        bool B(int i) => i < p.Length && p[i] == bool.TrueString;
+        switch (p[0])
+        {
+            case "pixel": return Pixel;
+            case "cursor": return Cursor;
+            case "crate": return Crate;
+            case "plank": return Plank;
+            case "bigstone": return BigStone;
+            case "ice": return Ice;
+            case "spikes": return Spikes;
+            case "saw": return Saw;
+            case "cannon": return Cannon;
+            case "bone": return Bone;
+            case "bomb": return Bomb;
+            case "brain": return Brain;
+            case "pedestal": return Pedestal;
+            case "tree": return DeadTree;
+            case "moon": return Moon;
+            case "glow": return Glow;
+            case "dot": return Dot;
+            case "fog": return Fog;
+            case "rail": return Rail;
+            case "loco": return Locomotive;
+            case "wagon": return Wagon;
+            case "icetile": return IceTile;
+            case "flamethrower": return Flamethrower;
+            case "rottencrate": return RottenCrate;
+            case "fanbase": return FanBase;
+            case "fanblades": return FanBlades;
+            case "zombie": return ZombieFrames(I(1))[Mathf.Clamp(I(2), 0, 7)];
+            case "ground": return Ground(B(1), I(2));
+            case "stone": return Stone(B(1));
+            case "spring": return Spring(B(1));
+            case "tomb": return Tombstone(I(1));
+            case "arrow": return Arrow(I(1));
+            case "sky": return Sky(I(1));
+            case "hills": return Hills(I(1), new Color32((byte)I(2), (byte)I(3), (byte)I(4), 255));
+            case "acid": return Acid(B(1), I(2));
+            case "sawrail": return SawRail(I(1));
+            case "portal": return Portal(I(1), I(2));
+            case "conveyor": return Conveyor(I(1));
+            case "flame": return Flame(I(1));
+            default: return null;
+        }
+    }
+
     static float Hash(int x, int y, int seed)
     {
         unchecked
