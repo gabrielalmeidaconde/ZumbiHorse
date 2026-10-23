@@ -14,8 +14,13 @@ jobs:
           ITCH_GAME: ${{ vars.ITCH_GAME }}
         run: |
           if [ -z "$KEY" ]; then echo "::error::A BUTLER_API_KEY não está cadastrada"; exit 1; fi
-          resp=$(curl -s -H "Authorization: $KEY" https://api.itch.io/profile)
-          user=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin).get('user', {}).get('username', ''))")
-          if [ -z "$user" ]; then echo "::error::O itch.io recusou a chave: $resp"; exit 1; fi
-          echo "Chave OK: conta do itch.io = $user"
+          clean=$(printf '%s' "$KEY" | tr -d '[:space:]')
+          [ "$clean" != "$KEY" ] && echo "::warning::A chave cadastrada tinha espaços ou quebra de linha (o build vai limpar isso)"
+          echo "Tamanho da chave: ${#clean} caracteres"
+          name() { python3 -c "import json,sys; print(json.load(sys.stdin).get('user', {}).get('username', ''))" 2>/dev/null; }
+          user=$(curl -s "https://itch.io/api/1/$clean/me" | name); how="api/1/KEY/me"
+          [ -z "$user" ] && { user=$(curl -s -H "Authorization: $clean" https://api.itch.io/profile | name); how="Authorization: KEY"; }
+          [ -z "$user" ] && { user=$(curl -s -H "Authorization: Bearer $clean" https://api.itch.io/profile | name); how="Authorization: Bearer KEY"; }
+          if [ -z "$user" ]; then echo "::error::O itch.io recusou a chave nos três formatos (chave errada ou revogada?)"; exit 1; fi
+          echo "Chave OK ($how): conta do itch.io = $user"
           if [ -z "$ITCH_GAME" ]; then echo "::notice::Falta a variável ITCH_GAME (ex.: $user/nome-do-jogo)"; else echo "ITCH_GAME = $ITCH_GAME"; fi
