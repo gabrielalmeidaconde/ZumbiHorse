@@ -12,7 +12,7 @@ using Unity.Services.Relay.Models;
 using UnityEngine;
 
 /// <summary>
-/// Conexão do multiplayer online (Unity Transport). O host aceita até 3 computadores.
+/// Conexão do multiplayer online (Unity Transport). O host aceita até 7 computadores.
 /// Cada mensagem vai pelo canal confiável (sempre chega, em ordem) ou pelo rápido (pode se perder;
 /// usado para o que é mandado o tempo todo, como os botões e o placar).
 /// Liga pelo Unity Relay (código de sala: funciona pela internet e no navegador) ou por IP (rede local).
@@ -21,7 +21,7 @@ using UnityEngine;
 /// </summary>
 public class NetTransport : IDisposable
 {
-    public const int MaxClients = 3;
+    public const int MaxClients = 7;
     public const ushort DefaultPort = 7777;
     /// <summary>Tamanho máximo de uma mensagem (cabe num pacote mesmo passando pelo Relay).</summary>
     public const int MaxMessage = 1100;
@@ -126,18 +126,42 @@ public class NetTransport : IDisposable
         if (!AuthenticationService.Instance.IsSignedIn) await AuthenticationService.Instance.SignInAnonymouslyAsync();
     }
 
+    /// <summary>Só para testes (-zumbiLag ms): atrasa cada pacote enviado e recebido e perde 2% deles.</summary>
+    static int SimulatedLagMs
+    {
+        get
+        {
+            var args = Environment.GetCommandLineArgs();
+            int i = Array.IndexOf(args, "-zumbiLag");
+            return i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int ms) ? ms : 0;
+        }
+    }
+
     void CreateDriver(NetworkSettings settings, bool webSocket)
     {
-        settings.WithReliableStageParameters(windowSize: 64);
+        // Pelo Relay a ida e volta passa fácil de 200 ms (o padrão). Com pouca paciência, o canal confiável
+        // reenvia pacotes que nem se perderam, a rede congestiona e o atraso só cresce.
+        settings.WithReliableStageParameters(windowSize: 64, minimumResendTime: 150, maximumResendTime: 1500);
         settings.WithNetworkConfigParameters(disconnectTimeoutMS: 15000);
+        int lag = SimulatedLagMs;
+        if (lag > 0) settings.WithSimulatorStageParameters(maxPacketCount: 1000, mode: ApplyMode.AllPackets, packetDelayMs: lag, packetDropPercentage: 2);
 #if UNITY_WEBGL && !UNITY_EDITOR
         driver = NetworkDriver.Create(new WebSocketNetworkInterface(), settings); // o navegador só tem WebSocket
 #else
         driver = webSocket ? NetworkDriver.Create(new WebSocketNetworkInterface(), settings)
                            : NetworkDriver.Create(new UDPNetworkInterface(), settings);
 #endif
-        reliable = driver.CreatePipeline(typeof(ReliableSequencedPipelineStage));
-        fast = driver.CreatePipeline(typeof(UnreliableSequencedPipelineStage));
+        if (lag > 0)
+        {
+            reliable = driver.CreatePipeline(typeof(ReliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
+            fast = driver.CreatePipeline(typeof(UnreliableSequencedPipelineStage), typeof(SimulatorPipelineStage));
+            Debug.Log($"[Net] simulando {lag} ms de atraso e 2% de perda");
+        }
+        else
+        {
+            reliable = driver.CreatePipeline(typeof(ReliableSequencedPipelineStage));
+            fast = driver.CreatePipeline(typeof(UnreliableSequencedPipelineStage));
+        }
     }
 
     void Listen(NetworkEndpoint endpoint)

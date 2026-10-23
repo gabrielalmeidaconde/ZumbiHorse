@@ -49,7 +49,12 @@ public class ItemInstance : MonoBehaviour
 
     public Vector2 RotatedCenter => ItemDefs.Rotate(Def.Center, Rotation);
 
-    public void ApplyRotation() => transform.rotation = Quaternion.Euler(0, 0, Rotation * 90f);
+    public void ApplyRotation()
+    {
+        transform.rotation = Def.KeepUpright ? Quaternion.identity : Quaternion.Euler(0, 0, Rotation * 90f);
+        var mover = GetComponent<MovingBlock>();
+        if (mover != null) mover.SetDirection(Rotation);
+    }
 
     /// <summary>Posiciona livremente (sem grade) com o centro visual em p.</summary>
     public void ShowAt(Vector2 p) => transform.position = p - RotatedCenter;
@@ -57,7 +62,7 @@ public class ItemInstance : MonoBehaviour
     public List<Vector2Int> Footprint(Vector2Int pivot)
     {
         var list = new List<Vector2Int>();
-        foreach (var c in Def.Cells) list.Add(pivot + ItemDefs.Rotate(c, Rotation));
+        foreach (var c in ItemDefs.Footprint(Def, Rotation)) list.Add(pivot + c);
         return list;
     }
 
@@ -76,9 +81,9 @@ public class ItemInstance : MonoBehaviour
     public static bool CanPlace(ItemDef def, Vector2Int pivot, int rotation)
     {
         if (def.Type == ItemType.Bomba) return Level.InBounds(pivot);
-        foreach (var cell in def.Cells)
+        foreach (var cell in ItemDefs.Footprint(def, rotation))
         {
-            var c = pivot + ItemDefs.Rotate(cell, rotation);
+            var c = pivot + cell;
             if (!Level.InBounds(c) || Level.IsProtected(c)) return false;
             if (Level.Occupied.TryGetValue(c, out var o) && o != null) return false;
         }

@@ -20,7 +20,14 @@ public static class Art
         new Color32(70, 145, 245, 255),  // azul
         new Color32(245, 200, 55, 255),  // amarelo
         new Color32(185, 95, 235, 255),  // roxo
+        new Color32(245, 140, 45, 255),  // laranja
+        new Color32(45, 200, 185, 255),  // verde-água
+        new Color32(245, 110, 180, 255), // rosa
+        new Color32(225, 225, 235, 255), // branco
     };
+
+    /// <summary>Cor do jogador i (P1 = 0).</summary>
+    public static Color PlayerColor(int i) => PlayerColors[Mathf.Abs(i) % PlayerColors.Length];
 
     static readonly Color32[] SkinColors =
     {
@@ -28,6 +35,10 @@ public static class Art
         new Color32(150, 178, 140, 255),
         new Color32(105, 178, 158, 255),
         new Color32(168, 182, 88, 255),
+        new Color32(140, 190, 110, 255),
+        new Color32(120, 170, 150, 255),
+        new Color32(160, 175, 100, 255),
+        new Color32(130, 180, 125, 255),
     };
 
     static readonly Color32[] HairColors =
@@ -36,6 +47,10 @@ public static class Art
         new Color32(100, 62, 36, 255),
         new Color32(205, 205, 195, 255),
         new Color32(200, 95, 40, 255),
+        new Color32(60, 60, 70, 255),
+        new Color32(150, 110, 60, 255),
+        new Color32(90, 40, 30, 255),
+        new Color32(230, 200, 120, 255),
     };
 
     public static readonly Color32 Outline = new Color32(22, 18, 28, 255);
@@ -170,6 +185,9 @@ public static class Art
             case "rottencrate": return RottenCrate;
             case "fanbase": return FanBase;
             case "fanblades": return FanBlades;
+            case "platform": return MovingPlatform;
+            case "seesaw": return SeesawPlank;
+            case "seesawbase": return SeesawBase;
             case "zombie": return ZombieFrames(I(1))[Mathf.Clamp(I(2), 0, 7)];
             case "ground": return Ground(B(1), I(2));
             case "stone": return Stone(B(1));
@@ -247,7 +265,7 @@ public static class Art
     /// <summary>Quadros do zumbi: 0-1 parado, 2-5 andando, 6 pulando, 7 caindo.</summary>
     public static Sprite[] ZombieFrames(int variant)
     {
-        variant = Mathf.Abs(variant) % 4;
+        variant = Mathf.Abs(variant) % PlayerColors.Length;
         // (pernas, deslocamento do tronco para baixo)
         var spec = new (int legs, int bob)[] { (0, 0), (0, 1), (1, 0), (2, 1), (3, 0), (2, 1), (4, 0), (1, 0) };
         var frames = new Sprite[spec.Length];
@@ -684,6 +702,54 @@ public static class Art
                 c.Set(x, y, C(255, 255, 255, (int)(a * a * 255)));
             }
         return c.ToSprite(new Vector2(32, 32), 16, FilterMode.Bilinear);
+    });
+
+    // ------------------------------------------------------------------ plataforma móvel e gangorra
+
+    /// <summary>Plataforma de metal 3x0,5 com faixas de aviso (item "Plataforma Móvel").</summary>
+    public static Sprite MovingPlatform => Cached("platform", () =>
+    {
+        var c = new Canvas(48, 8);
+        Color32 steel = C(120, 126, 140), steelL = C(160, 166, 180), steelD = C(78, 82, 96);
+        Color32 yellow = C(240, 196, 60), black = C(36, 34, 40);
+        c.Rect(0, 0, 48, 8, steel);
+        c.Rect(0, 0, 48, 1, steelL);
+        c.Rect(0, 7, 48, 1, steelD);
+        for (int x = 0; x < 48; x++)
+            if (x < 6 || x >= 42) for (int y = 1; y < 7; y++) c.Set(x, y, (x + y) / 3 % 2 == 0 ? yellow : black);
+        for (int x = 10; x < 40; x += 10) { c.Set(x, 3, steelD); c.Set(x, 4, steelL); }
+        return c.ToSpriteCentered();
+    });
+
+    /// <summary>Prancha da gangorra (5 x 0,44), com o parafuso no meio.</summary>
+    public static Sprite SeesawPlank => Cached("seesaw", () =>
+    {
+        var c = new Canvas(80, 7);
+        Color32 wood = C(176, 120, 70), woodL = C(206, 152, 98), woodD = C(128, 84, 48), metal = C(150, 150, 165);
+        c.Rect(0, 0, 80, 7, wood);
+        c.Rect(0, 0, 80, 1, woodL);
+        c.Rect(0, 6, 80, 1, woodD);
+        for (int x = 16; x < 80; x += 16) c.Rect(x, 1, 1, 5, woodD);
+        c.Rect(0, 0, 3, 7, woodD);
+        c.Rect(77, 0, 3, 7, woodD);
+        c.Disc(40f, 3.5f, 2.6f, metal);
+        c.Set(40, 3, C(90, 90, 105));
+        return c.ToSpriteCentered();
+    });
+
+    /// <summary>Apoio triangular de pedra embaixo da gangorra.</summary>
+    public static Sprite SeesawBase => Cached("seesawbase", () =>
+    {
+        var c = new Canvas(16, 16);
+        Color32 stone = C(126, 120, 140), stoneL = C(156, 150, 170), stoneD = C(92, 86, 106);
+        for (int y = 0; y < 16; y++)
+        {
+            int half = 1 + y * 7 / 15;
+            for (int x = 8 - half; x < 8 + half; x++) c.Set(x, y, x < 8 ? stoneL : stone);
+        }
+        c.Rect(1, 14, 14, 2, stoneD);
+        c.AddOutline(Outline);
+        return c.ToSpriteCentered();
     });
 
     // ------------------------------------------------------------------ interface (teclas e botões)

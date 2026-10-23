@@ -14,8 +14,9 @@ public enum NetMode { Offline, Connecting, Host, Client }
 public class NetGame : MonoBehaviour
 {
     /// <summary>Muda quando as mensagens mudam: host e cliente precisam da mesma versão.</summary>
-    public const int Protocol = 2;
-    const float SendInterval = 1f / 20f;
+    public const int Protocol = 4;
+    const float SendInterval = 1f / 30f;
+    const float PingInterval = 0.5f;
     const float ConnectTimeout = 20f;
 
     public static NetGame Instance { get; private set; }
@@ -31,6 +32,8 @@ public class NetGame : MonoBehaviour
     public int MyId { get; private set; }
     /// <summary>Computadores conectados à sala, contando o host.</summary>
     public int Computers { get; set; } = 1;
+    /// <summary>No cliente: tempo de ida e volta até o host, em milissegundos (0 = ainda não medido).</summary>
+    public int PingMs { get; private set; }
 
     /// <summary>Painel online aberto: o teclado deste computador está digitando, não jogando.</summary>
     public static bool PanelOpen { get; set; }
@@ -42,7 +45,7 @@ public class NetGame : MonoBehaviour
 
     NetTransport transport;
     GameManager gm;
-    float sendTimer, connectTimer, statsTimer = 10f;
+    float sendTimer, connectTimer, pingTimer, statsTimer = 10f;
     long statsBytes;
 
     // host
@@ -50,6 +53,7 @@ public class NetGame : MonoBehaviour
     readonly HashSet<int> clients = new HashSet<int>();
     readonly Dictionary<(int, int), InputSource> remote = new Dictionary<(int, int), InputSource>();
     readonly Dictionary<InputSource, byte[]> lastCounters = new Dictionary<InputSource, byte[]>();
+    readonly List<byte[]> events = new List<byte[]>();   // sons e textos: vão junto com a próxima atualização
 
     // cliente
     SceneMirror mirror;
@@ -160,6 +164,8 @@ public class NetGame : MonoBehaviour
         transport = null;
         Mode = NetMode.Offline;
         Computers = 1;
+        PingMs = 0;
+        events.Clear();
         Sfx.Played -= OnSound;
         GameManager.FloatAdded -= OnFloat;
 
@@ -246,10 +252,20 @@ public class NetGame : MonoBehaviour
         {
             mirror?.Update(Time.unscaledDeltaTime);
             SendInput();
+            pingTimer -= Time.unscaledDeltaTime;
+            if (pingTimer <= 0f)
+            {
+                pingTimer = PingInterval;
+                var ms = new MemoryStream();
+                var pw = new BinaryWriter(ms);
+                pw.Write(Msg.Ping);
+                pw.Write(Time.realtimeSinceStartup);
+                Send(ms.ToArray(), false);
+            }
             return;
         }
 
-        // host: manda a cena e a interface 20 vezes por segundo
+        // host: manda a cena e a interface 30 vezes por segundo
         Computers = 1 + clients.Count;
         sendTimer -= Time.unscaledDeltaTime;
         if (sendTimer > 0f || clients.Count == 0) return;
@@ -275,7 +291,46 @@ public class NetGame : MonoBehaviour
     {
         var msgs = new List<byte[]>();
         sync.Capture(msgs);
-        foreach (var m in msgs) Broadcast(m, true);
+        msgs.AddRange(events);
+        events.Clear();
+        foreach (var b in Pack(msgs)) Broadcast(b, true);
+    }
+
+    /// <summary>
+    /// Junta várias mensagens em pacotes de até ~1 KB ([Bundle][quantidade][tamanho + mensagem]...): menos
+    /// pacotes na rede e menos confirmações esperando no canal confiável.
+    /// </summary>
+    static List<byte[]> Pack(List<byte[]> msgs)
+    {
+        var packs = new List<byte[]>();
+        MemoryStream ms = null;
+        BinaryWriter w = null;
+        int n = 0;
+        void Close()
+        {
+            if (ms == null) return;
+            var bytes = ms.ToArray();
+            bytes[1] = (byte)n;
+            packs.Add(bytes);
+            ms = null;
+        }
+        foreach (var m in msgs)
+        {
+            if (ms != null && (ms.Length + m.Length + 2 > NetTransport.MaxMessage || n == 255)) Close();
+            if (ms == null)
+            {
+                ms = new MemoryStream();
+                w = new BinaryWriter(ms);
+                w.Write(Msg.Bundle);
+                w.Write((byte)0);
+                n = 0;
+            }
+            w.Write((ushort)m.Length);
+            w.Write(m);
+            n++;
+        }
+        Close();
+        return packs;
     }
 
     // ================================================================== host
@@ -307,12 +362,17 @@ public class NetGame : MonoBehaviour
             else sync.Capture(new List<byte[]>());
             var all = new List<byte[]>();
             sync.FullState(all);
-            foreach (var m in all) transport.Send(id, m, true);
+            foreach (var b in Pack(all)) transport.Send(id, b, true);
             clients.Add(id);
             Sfx.Play("join");
             Debug.Log($"[Net] cliente {id} entrou ({all.Count} mensagens de cena)");
         }
         else if (type == Msg.Input && clients.Contains(id)) ReadInput(id, r);
+        else if (type == Msg.Ping && clients.Contains(id))
+        {
+            data[0] = Msg.Pong; // devolve o mesmo horário: o cliente calcula a ida e volta
+            transport.Send(id, data, false);
+        }
     }
 
     void HostLost(int id)
@@ -368,7 +428,7 @@ public class NetGame : MonoBehaviour
         w.Write(name);
         w.Write(volume);
         w.Write(pitch);
-        Broadcast(ms.ToArray(), true);
+        events.Add(ms.ToArray());
     }
 
     void OnFloat(Vector2 pos, string text, Color color, int size, float duration)
@@ -383,7 +443,7 @@ public class NetGame : MonoBehaviour
         w.Write(c.r); w.Write(c.g); w.Write(c.b); w.Write(c.a);
         w.Write((byte)size);
         w.Write(duration);
-        Broadcast(ms.ToArray(), true);
+        events.Add(ms.ToArray());
     }
 
     // ================================================================== cliente
@@ -409,6 +469,14 @@ public class NetGame : MonoBehaviour
                 Leave();
                 SetStatus(why, true);
                 PanelOpen = true;
+                break;
+            case Msg.Bundle:
+                int n = r.ReadByte();
+                for (int i = 0; i < n; i++) ClientReceive(id, r.ReadBytes(r.ReadUInt16()));
+                break;
+            case Msg.Pong:
+                int rtt = Mathf.RoundToInt((Time.realtimeSinceStartup - r.ReadSingle()) * 1000f);
+                PingMs = PingMs == 0 ? rtt : Mathf.RoundToInt(Mathf.Lerp(PingMs, rtt, 0.3f));
                 break;
             case Msg.SpriteKey:
             case Msg.Objects:
@@ -493,10 +561,12 @@ public class NetGame : MonoBehaviour
             int sprites = 0;
             foreach (var sr in FindObjectsByType<SpriteRenderer>(FindObjectsSortMode.None))
                 if (sr.enabled && sr.sprite != null && sr.gameObject.activeInHierarchy) sprites++;
-            Debug.Log($"[Net] host: {kbps:0.0} KB/s enviados, {sprites} sprites na cena, fase {gm.Phase}");
+            int backlog = 0;
+            foreach (int id in clients) backlog = Mathf.Max(backlog, transport.Backlog(id));
+            Debug.Log($"[Net] host: {kbps:0.0} KB/s enviados, {sprites} sprites na cena, fila {backlog}, fase {gm.Phase}");
         }
         else if (Mode == NetMode.Client)
-            Debug.Log($"[Net] cliente: {kbps:0.0} KB/s recebidos, {mirror?.Count ?? 0} sprites copiados, fase {gm.Phase}");
+            Debug.Log($"[Net] cliente: {kbps:0.0} KB/s recebidos, {mirror?.Count ?? 0} sprites copiados, ping {PingMs} ms, fase {gm.Phase}");
     }
 
     /// <summary>IP deste computador na rede local (para mostrar a quem vai entrar pela rede local).</summary>

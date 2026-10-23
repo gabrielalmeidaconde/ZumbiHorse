@@ -28,7 +28,7 @@ public class PlayerSlot
     public ItemType? HeldView;
     public bool HeldSecondPortal;
 
-    public Color Color => Art.PlayerColors[Index % 4];
+    public Color Color => Art.PlayerColor(Index);
     public string Name => "P" + (Index + 1);
     public string FullName => IsBot ? Name + " (CPU)" : Name;
 }
@@ -43,7 +43,7 @@ public partial class GameManager : MonoBehaviour
 {
     /// <summary>Pontos para vencer a partida.</summary>
     public static int WinScore = 10;
-    public const int MaxPlayers = 4;
+    public const int MaxPlayers = 8;
     const float PickTime = 20f, PlaceTime = 30f, RunTime = 75f;
     /// <summary>Quando todos os humanos já morreram ou chegaram, os bots têm no máximo este tempo.</summary>
     const float BotsOnlyTime = 12f;
@@ -73,7 +73,7 @@ public partial class GameManager : MonoBehaviour
     readonly List<ItemInstance> boxItems = new List<ItemInstance>();
     GameObject boxRoot;
     static readonly Vector2 BoxCenter = new Vector2(0f, 0.5f);
-    const float BoxSpacing = 3.6f;
+    const float BoxSpacing = 6f; // a gangorra tem 5 de largura
 
     float pickTimer, placeTimer, runTimer, doneTimer = -1f;
     bool timeUp, botsOnly;
@@ -389,10 +389,10 @@ public partial class GameManager : MonoBehaviour
             for (int i = 0; i < count; i++) types[i] = ForcedBox[(i + (Round - 1) * count) % ForcedBox.Count];
 
         boxRoot = new GameObject("Caixa de itens");
-        float width = count * BoxSpacing + 1f;
+        float width = BoxPerRow(count) * BoxSpacing + 1f, height = BoxHeight(count);
         Quad(boxRoot, Vector2.zero, new Vector2(80f, 50f), new Color(0f, 0f, 0f, 0.55f), 100);
-        Quad(boxRoot, BoxCenter, new Vector2(width + 0.35f, 5.35f), new Color(0.72f, 0.5f, 0.95f), 101);
-        Quad(boxRoot, BoxCenter, new Vector2(width, 5f), new Color(0.12f, 0.08f, 0.17f, 0.98f), 102);
+        Quad(boxRoot, BoxCenter, new Vector2(width + 0.35f, height + 0.35f), new Color(0.72f, 0.5f, 0.95f), 101);
+        Quad(boxRoot, BoxCenter, new Vector2(width, height), new Color(0.12f, 0.08f, 0.17f, 0.98f), 102);
 
         for (int i = 0; i < count; i++)
         {
@@ -407,14 +407,26 @@ public partial class GameManager : MonoBehaviour
         for (int i = 0; i < Players.Count; i++)
         {
             var p = Players[i];
-            p.Cursor = PlayerCursor.Create(p.Index, BoxCenter + new Vector2((i - (Players.Count - 1) / 2f) * 2f, -3.6f));
+            p.Cursor = PlayerCursor.Create(p.Index, BoxCenter + new Vector2((i - (Players.Count - 1) / 2f) * 2f, -height / 2f - 1.1f));
         }
     }
 
     static bool IsBuildingBlock(ItemType t) =>
-        t == ItemType.Caixa || t == ItemType.Prancha || t == ItemType.Pedra || t == ItemType.Gelo || t == ItemType.CaixaPodre || t == ItemType.Esteira;
+        t == ItemType.Caixa || t == ItemType.Prancha || t == ItemType.Pedra || t == ItemType.Gelo || t == ItemType.CaixaPodre || t == ItemType.Esteira ||
+        t == ItemType.PlataformaMovel || t == ItemType.Gangorra;
 
-    static Vector2 BoxSlot(int i, int count) => BoxCenter + new Vector2((i - (count - 1) / 2f) * BoxSpacing, 0.3f);
+    // Mais de 6 itens (5 jogadores ou mais): duas fileiras
+    const float BoxRowGap = 4.6f;
+    static int BoxRows(int count) => count > 6 ? 2 : 1;
+    static int BoxPerRow(int count) => BoxRows(count) == 2 ? (count + 1) / 2 : count;
+    static float BoxHeight(int count) => 5f + (BoxRows(count) - 1) * BoxRowGap;
+
+    static Vector2 BoxSlot(int i, int count)
+    {
+        int per = BoxPerRow(count), row = i / per, inRow = row == 0 ? per : count - per;
+        float y = BoxRows(count) == 2 ? (row == 0 ? BoxRowGap : -BoxRowGap) / 2f : 0f;
+        return BoxCenter + new Vector2((i % per - (inRow - 1) / 2f) * BoxSpacing, 0.3f + y);
+    }
 
     static void Quad(GameObject parent, Vector2 pos, Vector2 size, Color color, int order)
     {
@@ -664,7 +676,7 @@ public partial class GameManager : MonoBehaviour
     public void OnZombieDied(Zombie z, int killer)
     {
         Vector2 pos = z.Position + Vector2.up * 1.2f;
-        AddFloat(pos, "ARGH!", Art.PlayerColors[z.Index % 4], 30, 1.2f);
+        AddFloat(pos, "ARGH!", Art.PlayerColor(z.Index), 30, 1.2f);
         var slot = Players.FirstOrDefault(p => p.Index == killer);
         if (slot != null && killer != z.Index)
         {
@@ -684,7 +696,7 @@ public partial class GameManager : MonoBehaviour
     public void OnZombieFinished(Zombie z)
     {
         finishOrder.Add(z.Index);
-        AddFloat(Level.GoalPosition + Vector2.up * 1.2f, "NHAC!", Art.PlayerColors[z.Index % 4], 36, 1.3f);
+        AddFloat(Level.GoalPosition + Vector2.up * 1.2f, "NHAC!", Art.PlayerColor(z.Index), 36, 1.3f);
     }
 
     void UpdateRoundEnd()
@@ -744,7 +756,7 @@ public partial class GameManager : MonoBehaviour
         {
             confettiTimer = 0.12f;
             var r = ViewRect(1f);
-            var col = Random.value < 0.5f ? Art.PlayerColors[winner % 4] : Art.PlayerColors[Random.Range(0, 4)];
+            var col = Random.value < 0.5f ? Art.PlayerColor(winner) : Art.PlayerColor(Random.Range(0, Art.PlayerColors.Length));
             Fx.Burst(new Vector2(Random.Range(r.xMin, r.xMax), r.yMax), col, 6, 3f, 0.18f, 3f, 2.5f);
         }
         if (PhaseTime > 2f && Players.Any(p => p.Input.ConfirmDown)) BackToLobby();
@@ -1039,61 +1051,62 @@ public partial class GameManager : MonoBehaviour
 
         DrawMapSelector(148f);
 
-        float gap = 30f, cw = Mathf.Min(360f, (VW - 80f - gap * 3) / 4f), ch = 345f;
-        float x0 = (VW - (cw * 4 + gap * 3)) / 2f, y0 = 286f;
+        // 8 lugares: 2 fileiras de 4 cartões (zumbi à esquerda, textos à direita)
+        float gap = 24f, cw = Mathf.Min(360f, (VW - 80f - gap * 3) / 4f), ch = 166f;
+        float x0 = (VW - (cw * 4 + gap * 3)) / 2f;
         var hint = new Color(0.7f, 0.85f, 1f);
+        var dim = new Color(0.65f, 0.65f, 0.7f);
         for (int i = 0; i < MaxPlayers; i++)
         {
-            float x = x0 + i * (cw + gap);
+            float x = x0 + (i % 4) * (cw + gap), y0 = 286f + (i / 4) * (ch + 12f);
+            float tx = x + 118f, tw = cw - 124f;
             var slot = Players.FirstOrDefault(p => p.Index == i);
             Fill(R(x, y0, cw, ch), new Color(0.08f, 0.06f, 0.13f, 0.88f));
-            Color pc = Art.PlayerColors[i];
-            var sprite = R(x + cw / 2 - 56, y0 + 60, 112, 124);
+            Color pc = Art.PlayerColor(i);
+            var sprite = R(x + 10, y0 + 22, 98, 109);
             if (slot == null)
             {
-                Fill(R(x, y0, cw, 8), new Color(0.3f, 0.3f, 0.35f));
-                Text(R(x, y0 + 14, cw, 44), $"JOGADOR {i + 1}", 30, new Color(0.5f, 0.5f, 0.55f));
+                Fill(R(x, y0, cw, 6), new Color(0.3f, 0.3f, 0.35f));
+                Text(R(tx, y0 + 10, tw, 34), $"JOGADOR {i + 1}", 24, new Color(0.5f, 0.5f, 0.55f), TextAnchor.MiddleLeft);
                 DrawSprite(sprite, Art.ZombieFrames(i)[0], new Color(0f, 0f, 0f, 0.5f));
-                Text(R(x, y0 + 192, cw, 30), "Para entrar aperte:", 21, new Color(0.8f, 0.8f, 0.85f));
-                Keys(R(x, y0 + 224, cw, 30), "[ESPAÇO] teclado WASD", 18, new Color(1f, 0.9f, 0.5f));
-                Keys(R(x, y0 + 256, cw, 30), "[ENTER] teclado setas", 18, new Color(1f, 0.9f, 0.5f));
-                if (InputSource.GamepadsSupported) Keys(R(x, y0 + 288, cw, 30), "{A} controle", 18, new Color(1f, 0.9f, 0.5f));
-                else Text(R(x, y0 + 288, cw, 30), "(controles indisponíveis)", 18, new Color(0.6f, 0.6f, 0.66f));
-                Text(R(x, y0 + 316, cw, 26), "ou CIMA para colocar um bot", 16, hint);
+                Text(R(tx, y0 + 46, tw, 26), "Para entrar:", 16, new Color(0.8f, 0.8f, 0.85f), TextAnchor.MiddleLeft);
+                Keys(R(tx, y0 + 74, tw, 28), InputSource.GamepadsSupported ? "[ESPAÇO] [ENTER] {A}" : "[ESPAÇO] [ENTER]", 16, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleLeft);
+                Text(R(tx, y0 + 104, tw, 22), InputSource.GamepadsSupported ? "WASD, setas ou controle" : "WASD ou setas", 13, dim, TextAnchor.MiddleLeft);
+                Text(R(tx, y0 + 130, tw, 24), "ou CIMA: colocar bot", 14, hint, TextAnchor.MiddleLeft);
                 continue;
             }
 
-            Fill(R(x, y0, cw, 8), pc);
-            Text(R(x, y0 + 14, cw, 44), $"JOGADOR {i + 1}", 30, pc);
+            Fill(R(x, y0, cw, 6), pc);
+            Text(R(tx, y0 + 10, tw, 34), $"JOGADOR {i + 1}", 24, pc, TextAnchor.MiddleLeft);
             var frames = Art.ZombieFrames(i);
 
             if (slot.IsBot)
             {
                 DrawSprite(sprite, frames[(int)(Time.time * 2f + i) % 2], Color.white);
-                Text(R(x, y0 + 190, cw, 34), "CPU", 26, new Color(0.85f, 0.85f, 0.9f));
-                Text(R(x, y0 + 226, cw, 46), slot.Bot.Label.ToUpper(), 38, slot.Bot.LabelColor);
+                Text(R(tx, y0 + 46, tw, 26), "CPU", 18, new Color(0.85f, 0.85f, 0.9f), TextAnchor.MiddleLeft);
+                Text(R(tx, y0 + 72, tw, 38), slot.Bot.Label.ToUpper(), 30, slot.Bot.LabelColor, TextAnchor.MiddleLeft);
                 if (slot == LastBot)
                 {
-                    Keys(R(x, y0 + 278, cw, 28), "[E] [SHIFT] {RB} dificuldade", 15, hint);
-                    Keys(R(x, y0 + 310, cw, 28), "[S] [v] ou BAIXO: tirar", 15, new Color(0.65f, 0.65f, 0.7f));
+                    Keys(R(tx, y0 + 112, tw, 24), "[E] [SHIFT] {RB} dificuldade", 13, hint, TextAnchor.MiddleLeft);
+                    Keys(R(tx, y0 + 138, tw, 24), "[S] [v] ou BAIXO: tirar", 13, dim, TextAnchor.MiddleLeft);
                 }
                 continue;
             }
 
             int f = slot.Ready ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
-            float hop = slot.Ready ? Mathf.Abs(Mathf.Sin(Time.time * 8f)) * 10f : 0f;
+            float hop = slot.Ready ? Mathf.Abs(Mathf.Sin(Time.time * 8f)) * 8f : 0f;
             DrawSprite(new Rect(sprite.x, sprite.y - hop * S, sprite.width, sprite.height), frames[f], Color.white, slot.Ready && (int)(Time.time * 2f) % 2 == 0);
-            Text(R(x, y0 + 190, cw, 34), DeviceLabel(slot), 24, new Color(0.85f, 0.85f, 0.9f));
+            Text(R(tx, y0 + 46, tw, 26), DeviceLabel(slot), 17, new Color(0.85f, 0.85f, 0.9f), TextAnchor.MiddleLeft);
             if (slot.Ready)
             {
-                Text(R(x, y0 + 228, cw, 48), "PRONTO!", 40, new Color(0.5f, 1f, 0.45f));
-                Keys(R(x, y0 + 292, cw, 30), $"{BackKey(slot.Input)} cancelar", 17, new Color(0.65f, 0.65f, 0.7f));
+                Text(R(tx, y0 + 74, tw, 40), "PRONTO!", 32, new Color(0.5f, 1f, 0.45f), TextAnchor.MiddleLeft);
+                Keys(R(tx, y0 + 126, tw, 26), $"{BackKey(slot.Input)} cancelar", 14, dim, TextAnchor.MiddleLeft);
             }
             else
             {
                 float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 6f);
-                Keys(R(x, y0 + 232, cw, 40), $"{ConfirmKey(slot.Input)} ficar pronto", 24, new Color(1f, 0.9f, 0.5f, blink));
-                Keys(R(x, y0 + 292, cw, 30), $"{BackKey(slot.Input)} sair", 17, new Color(0.65f, 0.65f, 0.7f));
+                Keys(R(tx, y0 + 78, tw, 34), $"{ConfirmKey(slot.Input)} ficar pronto", 18, new Color(1f, 0.9f, 0.5f, blink), TextAnchor.MiddleLeft);
+                Keys(R(tx, y0 + 126, tw, 26), $"{BackKey(slot.Input)} sair", 14, dim, TextAnchor.MiddleLeft);
             }
         }
 
@@ -1122,17 +1135,17 @@ public partial class GameManager : MonoBehaviour
         Fill(R(x, y, w, 4), new Color(0.72f, 0.5f, 0.95f));
 
         bool random = MapIndex >= Maps.All.Length;
-        float tx = x + 70f, ty = y + 12f, cell = 6.2f;
+        float tx = x + 70f, ty = y + 12f, cell = 198f / Level.W; // miniatura sempre do mesmo tamanho
         if (random)
         {
-            Fill(R(tx, ty, 32 * cell, 18 * cell), new Color(0.12f, 0.09f, 0.2f));
-            Text(R(tx, ty, 32 * cell, 18 * cell), "?", 70, new Color(0.85f, 0.7f, 1f));
+            Fill(R(tx, ty, Level.W * cell, Level.H * cell), new Color(0.12f, 0.09f, 0.2f));
+            Text(R(tx, ty, Level.W * cell, Level.H * cell), "?", 70, new Color(0.85f, 0.7f, 1f));
         }
         else DrawMapThumbnail(Maps.All[MapIndex], tx, ty, cell);
 
         string name = random ? "Aleatório" : Maps.All[MapIndex].Name;
         string desc = random ? "Sorteia um dos mapas quando a partida começar." : Maps.All[MapIndex].Description;
-        float textX = tx + 32 * cell + 30f;
+        float textX = tx + Level.W * cell + 30f;
         Text(R(textX, y + 10, w - (textX - x) - 60, 50), $"MAPA {MapIndex + 1}/{Maps.All.Length + 1}:  {name}", 34, Color.white, TextAnchor.MiddleLeft);
         Text(R(textX, y + 58, w - (textX - x) - 60, 32), desc, 21, new Color(0.85f, 0.82f, 0.92f), TextAnchor.MiddleLeft);
         Keys(R(textX, y + 88, w - (textX - x) - 60, 30), "[A] [D]  [<] [>]  ou analógico: trocar mapa", 16, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleLeft);
@@ -1162,7 +1175,7 @@ public partial class GameManager : MonoBehaviour
                     case 'X': c = new Color(0.95f, 0.3f, 0.3f); break;
                     case 'p': c = new Color(0.7f, 0.7f, 0.8f); break;
                     case 'G': c = new Color(1f, 0.55f, 0.72f); break;
-                    case '1': case '2': case '3': case '4': c = Art.PlayerColors[ch - '1']; break;
+                    case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': c = Art.PlayerColor(ch - '1'); break;
                     default: continue;
                 }
                 Fill(R(x + cx * cell, y + (Level.H - 1 - cy) * cell, cell, cell), c);
@@ -1194,7 +1207,9 @@ public partial class GameManager : MonoBehaviour
         }
 
         // placar resumido
-        float chipW = 290f, x0 = 24f, y = 72f;
+        // com muitos jogadores as etiquetas encolhem para caber numa linha
+        float chipW = Mathf.Min(290f, (VW - 48f - (Players.Count - 1) * 10f) / Mathf.Max(1, Players.Count)), x0 = 24f, y = 72f;
+        int nameSize = chipW >= 260f ? 22 : chipW >= 200f ? 19 : 16, stSize = chipW >= 260f ? 18 : 14;
         for (int i = 0; i < Players.Count; i++)
         {
             var p = Players[i];
@@ -1205,8 +1220,9 @@ public partial class GameManager : MonoBehaviour
             if (Phase == Phase.Pick) st = p.Picked ? "pronto" : "";
             else if (Phase == Phase.Place) st = p.Placed ? "pronto" : "";
             else if (p.ZombieView.HasValue) st = p.ZombieView == ZombieState.Finished ? "chegou" : p.ZombieView == ZombieState.Dead ? "morreu" : "";
-            Text(R(x + 16, y, chipW - 20, 40), $"{p.Name}{(p.IsBot ? " CPU" : "")}  {p.Score} pts", 22, p.Color, TextAnchor.MiddleLeft);
-            Text(R(x, y, chipW - 12, 40), st, 18, st == "morreu" ? new Color(1f, 0.5f, 0.45f) : new Color(0.6f, 1f, 0.5f), TextAnchor.MiddleRight);
+            string cpu = p.IsBot && chipW >= 200f ? " CPU" : "";
+            Text(R(x + 16, y, chipW - 20, 40), $"{p.Name}{cpu}  {p.Score} pts", nameSize, p.Color, TextAnchor.MiddleLeft);
+            Text(R(x, y, chipW - 12, 40), st, stSize, st == "morreu" ? new Color(1f, 0.5f, 0.45f) : new Color(0.6f, 1f, 0.5f), TextAnchor.MiddleRight);
         }
 
         if (Phase == Phase.Run && botsOnly)
@@ -1216,7 +1232,7 @@ public partial class GameManager : MonoBehaviour
     void DrawPick()
     {
         int count = boxView.Count;
-        WorldText(BoxCenter + new Vector2(0f, 3.25f), "A CAIXA DE ITENS", 34, new Color(0.85f, 0.7f, 1f));
+        WorldText(BoxCenter + new Vector2(0f, BoxHeight(count) / 2f + 0.75f), "A CAIXA DE ITENS", 34, new Color(0.85f, 0.7f, 1f));
         for (int i = 0; i < count; i++)
         {
             var it = boxView[i];
@@ -1224,7 +1240,7 @@ public partial class GameManager : MonoBehaviour
             if (it.Owner >= 0)
             {
                 var owner = Players.FirstOrDefault(p => p.Index == it.Owner);
-                WorldText(slot + new Vector2(0f, -1.55f), owner != null ? owner.Name : "", 30, Art.PlayerColors[it.Owner % 4]);
+                WorldText(slot + new Vector2(0f, -1.55f), owner != null ? owner.Name : "", 30, Art.PlayerColor(it.Owner));
             }
             else
             {
@@ -1322,9 +1338,12 @@ public partial class GameManager : MonoBehaviour
         Text(R(0, 60, VW, 90), $"PLACAR  —  RODADA {Round}", 60, new Color(0.85f, 0.75f, 1f));
         if (!string.IsNullOrEmpty(roundMessage)) Text(R(0, 150, VW, 50), roundMessage, 32, new Color(1f, 0.85f, 0.4f));
 
-        float segW = 90f, barX = (VW - segW * WinScore) / 2f + 60f, rowH = 150f;
-        float y0 = 250f + (MaxPlayers - Players.Count) * rowH * 0.5f;
+        // linhas de 150 px; com mais de 4 jogadores elas encolhem (k) para caber na tela
+        float segW = 90f, barX = (VW - segW * WinScore) / 2f + 60f, rowH = Mathf.Min(150f, 680f / Mathf.Max(1, Players.Count));
+        float k = rowH / 150f;
+        float y0 = 250f + (680f - rowH * Players.Count) * 0.5f;
         float grow = Mathf.Clamp01((PhaseTime - 0.4f) / 1.0f);
+        int Sz(float size, int min) => Mathf.Max(min, Mathf.RoundToInt(size * k));
 
         for (int i = 0; i < Players.Count; i++)
         {
@@ -1333,14 +1352,14 @@ public partial class GameManager : MonoBehaviour
             var frames = Art.ZombieFrames(p.Index);
             bool scored = p.Score > p.PrevScore;
             int fr = scored ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
-            DrawSprite(R(barX - 220, y - 10, 90, 100), frames[fr], Color.white);
-            Text(R(barX - 120, y, 110, 80), p.Name, 40, p.Color, TextAnchor.MiddleLeft);
-            if (p.IsBot) Text(R(barX - 120, y + 52, 110, 30), "CPU " + p.Bot.Label, 16, p.Bot.LabelColor, TextAnchor.MiddleLeft);
+            DrawSprite(R(barX - 130 - 90 * k, y - 10 * k, 90 * k, 100 * k), frames[fr], Color.white);
+            Text(R(barX - 120, y, 110, 80 * k), p.Name, Sz(40, 22), p.Color, TextAnchor.MiddleLeft);
+            if (p.IsBot) Text(R(barX - 120, y + 52 * k, 110, 30 * k), "CPU " + p.Bot.Label, Sz(16, 12), p.Bot.LabelColor, TextAnchor.MiddleLeft);
 
             float shown = Mathf.Lerp(p.PrevScore, p.Score, grow);
             for (int s = 0; s < WinScore; s++)
             {
-                var r = R(barX + s * segW + 3, y + 10, segW - 6, 60);
+                var r = R(barX + s * segW + 3, y + 10 * k, segW - 6, 60 * k);
                 Fill(r, new Color(1f, 1f, 1f, 0.08f));
                 float fill = Mathf.Clamp01(shown - s);
                 if (fill <= 0f) continue;
@@ -1348,11 +1367,11 @@ public partial class GameManager : MonoBehaviour
                 Fill(new Rect(r.x, r.y, r.width * fill, r.height), c);
             }
             if (p.Score > WinScore)
-                Text(R(barX + WinScore * segW + 10, y, 120, 80), $"+{p.Score - WinScore}", 30, p.Color, TextAnchor.MiddleLeft);
+                Text(R(barX + WinScore * segW + 10, y, 120, 80 * k), $"+{p.Score - WinScore}", Sz(30, 18), p.Color, TextAnchor.MiddleLeft);
 
             string pts = string.Join("    ", p.RoundPoints.Select(kv => $"+{kv.Value} {kv.Key}"));
-            Text(R(barX, y + 74, segW * WinScore, 40), pts, 24, new Color(0.9f, 0.9f, 0.95f), TextAnchor.MiddleLeft);
-            Text(R(barX + segW * WinScore - 200, y + 74, 200, 40), $"{p.Score} pts", 26, p.Color, TextAnchor.MiddleRight);
+            Text(R(barX, y + 74 * k, segW * WinScore, 40 * k), pts, Sz(24, 14), new Color(0.9f, 0.9f, 0.95f), TextAnchor.MiddleLeft);
+            Text(R(barX + segW * WinScore - 200, y + 74 * k, 200, 40 * k), $"{p.Score} pts", Sz(26, 15), p.Color, TextAnchor.MiddleRight);
         }
 
         // linha de chegada do placar
@@ -1385,7 +1404,8 @@ public partial class GameManager : MonoBehaviour
         for (int i = 0; i < ordered.Count; i++)
         {
             var p = ordered[i];
-            Text(R(0, 680 + i * 52, VW, 50), $"{i + 1}º   {p.FullName}   {p.Score} pts", 34, p.Color);
+            float lineH = Mathf.Min(52f, 330f / ordered.Count);
+            Text(R(0, 670 + i * lineH, VW, lineH), $"{i + 1}º   {p.FullName}   {p.Score} pts", Mathf.RoundToInt(34 * lineH / 52f), p.Color);
         }
         if (PhaseTime > 2f)
         {

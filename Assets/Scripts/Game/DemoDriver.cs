@@ -42,7 +42,7 @@ public class DemoDriver : MonoBehaviour
         var d = gm.gameObject.AddComponent<DemoDriver>();
         d.gm = gm;
         d.shotDir = Arg(args, "-zumbiShots");
-        if (int.TryParse(Arg(args, "-zumbiBots"), out int b)) d.botCount = Mathf.Clamp(b, 2, 4);
+        if (int.TryParse(Arg(args, "-zumbiBots"), out int b)) d.botCount = Mathf.Clamp(b, 2, GameManager.MaxPlayers);
         if (int.TryParse(Arg(args, "-zumbiRounds"), out int r)) d.maxRounds = Mathf.Max(1, r);
         d.diff = Arg(args, "-zumbiDiff") ?? "1";
         BotPlayer.PlaceOutOfTheWay = args.Contains("-zumbiNoItems");

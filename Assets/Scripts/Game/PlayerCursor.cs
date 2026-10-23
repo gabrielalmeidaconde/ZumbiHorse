@@ -21,7 +21,7 @@ public class PlayerCursor : MonoBehaviour
         c.Index = index;
         c.sr = go.AddComponent<SpriteRenderer>();
         c.sr.sprite = Art.Cursor;
-        c.sr.color = Art.PlayerColors[index % 4];
+        c.sr.color = Art.PlayerColor(index);
         c.sr.sortingOrder = 200 + index;
         c.Position = pos;
         return c;

@@ -145,6 +145,34 @@ public static class ItemFactory
                 break;
             }
 
+            case ItemType.PlataformaMovel:
+            {
+                var rail = AddSprite(root, Art.SawRail(MovingBlock.Travel + 1), Vector2.zero, 3);
+                var plat = Child(root, "Plataforma", Vector2.zero);
+                var rb = plat.AddComponent<Rigidbody2D>();
+                rb.bodyType = RigidbodyType2D.Kinematic;
+                AddBox(plat, new Vector2(0f, 0.25f), new Vector2(3f, 0.5f));
+                AddSprite(plat, Art.MovingPlatform, new Vector2(0f, 0.25f), 5);
+                var mover = root.AddComponent<MovingBlock>();
+                mover.Body = rb;
+                mover.Rail = rail.transform;
+                mover.SetDirection(0);
+                break;
+            }
+
+            case ItemType.Gangorra:
+            {
+                AddSprite(root, Art.SeesawBase, new Vector2(0f, -1f), 5);
+                AddBox(root, new Vector2(0f, -1f), new Vector2(0.6f, 1f)); // apoio
+                var plank = Child(root, "Prancha", new Vector2(0f, -0.3f));
+                var rb = plank.AddComponent<Rigidbody2D>();
+                rb.bodyType = RigidbodyType2D.Kinematic;
+                AddBox(plank, Vector2.zero, new Vector2(5f, 0.44f));
+                AddSprite(plank, Art.SeesawPlank, Vector2.zero, 5);
+                root.AddComponent<Seesaw>().Plank = rb;
+                break;
+            }
+
             case ItemType.Ventilador:
             {
                 AddSprite(root, Art.FanBase, Vector2.zero, 6);

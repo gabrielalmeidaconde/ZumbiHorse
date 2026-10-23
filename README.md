@@ -1,7 +1,7 @@
 # Ultimate Zumbi Horse
 
 Versão simples de **Ultimate Chicken Horse** com zumbis, feita em **Unity 6 (6000.3.25f1)**.
-Para 2 a 4 jogadores no mesmo computador ou **online** (veja [Multiplayer online](#multiplayer-online)).
+Para 2 a 8 jogadores (humanos e bots) no mesmo computador ou **online** (veja [Multiplayer online](#multiplayer-online)).
 
 Cada rodada tem três fases:
 
@@ -22,7 +22,7 @@ No lobby, qualquer jogador controla os bots:
 | Mudar a dificuldade do último bot | E | Shift direito | RB (ou Y) |
 
 Dá para misturar dificuldades (ex.: coloque um bot, deixe-o Difícil, coloque outro e deixe-o Fácil).
-Se os 4 lugares estiverem ocupados e um humano apertar CONFIRMAR, ele toma o lugar do último bot.
+Se os 8 lugares estiverem ocupados e um humano apertar CONFIRMAR, ele toma o lugar do último bot.
 A partida precisa de pelo menos um humano.
 
 | Dificuldade | Como joga |
@@ -50,11 +50,11 @@ No lobby, qualquer jogador troca o mapa com **esquerda/direita** (A/D, setas ou 
 
 | Mapa | O que tem |
 |---|---|
-| Cemitério | O clássico: três buracos e um paredão |
-| Estação Fantasma | Um trem fantasma vai e volta no fundo do vale (dá para pegar carona no teto; as pontas matam) |
-| Serraria | Serras fixas, uma serra que sobe e desce num pilar, outra que varre o chão e um poço de espinhos |
-| Pântano Ácido | Ilhas no meio de poças de ácido, chão de gelo e uma serra que sobe e desce |
-| Ferrovia Dupla | Dois trens em pontes sobre o ácido, a de cima quebrada no meio |
+| Cemitério | O clássico: três buracos, um paredão e um caminho de plataformas por cima |
+| Estação Fantasma | Um trem fantasma vai e volta no fundo do vale (dá para pegar carona no teto; as pontas matam) e pontes por cima |
+| Serraria | Serras fixas, uma serra que sobe e desce num pilar, outra que varre o chão, um poço de espinhos e um caminho por cima |
+| Pântano Ácido | Ilhas no meio do ácido (uma de gelo), uma serra que sobe e desce e plataformas por cima |
+| Ferrovia Dupla | Dois trens em pontes sobre o ácido; a de cima está quebrada (dá para pegar o trem ou pular pela pedra embaixo do buraco) |
 | Aleatório | Sorteia um dos mapas quando a partida começa |
 
 Não dá para colocar itens no trilho do trem (área marcada durante o posicionamento).
@@ -109,8 +109,8 @@ Aperte **O** no lobby para abrir o painel **JOGAR ONLINE**:
 - **Rede local**: criar sala / entrar pelo IP de quem criou (mesmo Wi-Fi, sem internet; não funciona no navegador).
 
 Quem entra na sala vê o lobby do host e cada teclado ou controle daquele computador entra apertando CONFIRMAR,
-como se estivesse no mesmo PC (dá para misturar: 2 no host + 2 em outro computador). No máximo 4 jogadores e
-4 computadores. Se alguém cair no meio da partida, o zumbi dele vira CPU (Médio) e a partida continua.
+como se estivesse no mesmo PC (dá para misturar: 2 no host + 2 em outro computador). No máximo 8 jogadores e
+8 computadores. Se alguém cair no meio da partida, o zumbi dele vira CPU (Médio) e a partida continua.
 
 Como funciona: o host roda o jogo de verdade (física, bots, pontuação). Os outros computadores mandam os botões
 dos seus dispositivos (60 vezes por segundo) e recebem de volta, 20 vezes por segundo, o que mudou na tela
@@ -139,13 +139,18 @@ Observações:
 - Redes de faculdade e de empresa às vezes bloqueiam o Relay (UDP) ou isolam os aparelhos do Wi-Fi uns dos outros
   (aí a rede local não funciona). A versão do navegador usa WebSocket seguro, que costuma passar nesses bloqueios.
 - Host e clientes precisam da mesma versão do jogo (senão o host recusa a conexão e avisa).
+- Quem entrou na sala vê o **ping** (tempo de ida e volta até o host) no canto de baixo da tela. Quem não é o host
+  sente esse atraso entre apertar um botão e ver o zumbi se mexer, porque a partida roda no computador do host.
+  Para ter menos atraso: o host deve ser quem tem a melhor internet; de preferência o jogo baixado (e não o navegador);
+  e, no navegador, a aba do jogo precisa ficar visível (o navegador deixa abas escondidas bem mais lentas, e aí o
+  jogo fica lento para todo mundo).
 - O código de sala usa WebSocket seguro (como um site). Se no jogo baixado não conectar, teste abrir os dois
   jogos com `-relayDtls` (usa UDP, o padrão da Unity). A versão do navegador sempre usa WebSocket.
 
 ## Itens
 
-Todos os itens giram (menos a bomba): o giro muda a direção da mola, do canhão, do lança-chamas,
-do ventilador, da esteira e da serra móvel, e deixa a prancha ou os portais na vertical/horizontal.
+Todos os itens giram (menos a bomba e a gangorra): o giro muda a direção da mola, do canhão, do lança-chamas,
+do ventilador, da esteira, da serra móvel e da plataforma móvel, e deixa a prancha ou os portais na vertical/horizontal.
 
 | Item | O que faz |
 |---|---|
@@ -164,6 +169,8 @@ do ventilador, da esteira e da serra móvel, e deixa a prancha ou os portais na 
 | Canhão de Ossos | Atira um osso a cada 2,2 s durante a corrida |
 | Lança-Chamas | Cospe fogo (2,5 células) por 1,1 s, a cada 2,8 s |
 | Bomba | Explode tudo numa área 3x3 (não destrói pedra, trilhos e coisas do mapa) |
+| Plataforma Móvel | Plataforma de 3 que vai e volta 3 células e carrega quem está em cima. Fica sempre na horizontal; girar escolhe a direção (direita, cima, esquerda, baixo). Ocupa o trajeto inteiro |
+| Gangorra | Prancha de 5 sobre um apoio: o lado com mais peso desce e o outro sobe (quanto mais na ponta, mais peso). Dá para arremessar quem está do outro lado |
 
 Não dá para colocar itens nas áreas de largada e de chegada (aparecem marcadas no posicionamento).
 
@@ -252,8 +259,8 @@ Assets/
 ```
 
 Para ajustar a física do zumbi, mexa nas constantes no topo de `Zombie.cs`.
-Para mudar ou criar mapas, edite `MapDefs.cs`: cada mapa é um desenho de 18 linhas x 32 colunas
-(`#` terra, `S` pedra, `=` trilho, `a` ácido, `X` serra, `^` espinhos, `1-4` largada, `G` cérebro...),
+Para mudar ou criar mapas, edite `MapDefs.cs`: cada mapa é um desenho de 27 linhas x 48 colunas
+(`#` terra, `S` pedra, `=` trilho, `a` ácido, `X` serra, `^` espinhos, `1-8` largada, `G` cérebro...),
 mais a lista de trens e serras móveis.
 Para mudar a pontuação, veja `WinScore` e `Points*` no topo de `GameManager.cs`.
 

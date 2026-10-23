@@ -70,6 +70,8 @@ public class NavGrid
             var rb = c.attachedRigidbody;
             if (rb != null && (rb.GetComponent<Zombie>() != null || rb.GetComponent<Projectile>() != null)) continue;
             if (c.GetComponentInParent<Train>() != null) continue;          // trem é perigo dinâmico
+            var mover = c.GetComponentInParent<MovingBlock>();
+            if (mover != null && rb == mover.Body) continue;                 // plataforma móvel: não fica onde está
             var item = c.GetComponentInParent<ItemInstance>();
             if (item != null && !item.Placed) continue;                      // fantasmas e itens da caixa
             if (removed != null && removed.Count > 0)
@@ -214,10 +216,12 @@ public class NavGrid
             TryEdge(list, n, feet, GoalX, true, EdgeKind.Jump, true);
             TryEdge(list, n, feet, GoalX, false, EdgeKind.Walk, true);
 
-            foreach (var m in Nodes)
+            // só os vizinhos que um pulo alcança (até 6 para o lado, 3 para cima, 9 para baixo)
+            for (int dx = -6; dx <= 6; dx++)
+            for (int dy = -9; dy <= 3; dy++)
             {
-                int dx = m.x - n.x, dy = m.y - n.y;
-                if (m == n || Mathf.Abs(dx) > 6 || dy > 3 || dy < -9) continue;
+                var m = new Vector2Int(n.x + dx, n.y + dy);
+                if (m == n || !Nodes.Contains(m)) continue;
                 float tx = NodeFeet(m).x;
                 if (dy == 0 && Mathf.Abs(dx) == 1) { TryEdge(list, n, feet, tx, false, EdgeKind.Walk); continue; }
                 TryEdge(list, n, feet, tx, true, EdgeKind.Jump);

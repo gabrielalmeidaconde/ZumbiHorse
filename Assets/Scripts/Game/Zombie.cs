@@ -53,6 +53,8 @@ public class Zombie : MonoBehaviour
     public bool OnIce => onIce;
     /// <summary>Trem embaixo dos pés (pegando carona), ou null.</summary>
     public Train GroundTrain { get; private set; }
+    /// <summary>Gangorra embaixo dos pés (ela usa isso para saber o peso de cada lado), ou null.</summary>
+    public Seesaw GroundSeesaw { get; private set; }
 
     public static Zombie Spawn(int index, InputSource controls, Vector2 pos)
     {
@@ -210,6 +212,7 @@ public class Zombie : MonoBehaviour
         onIce = false;
         groundVelocity = Vector2.zero;
         GroundTrain = null;
+        GroundSeesaw = null;
         if (v.y > 0.5f) return;
 
         hits.Clear();
@@ -227,6 +230,10 @@ public class Zombie : MonoBehaviour
             }
             var train = h.GetComponentInParent<Train>();
             if (train != null) { groundVelocity += train.Velocity; GroundTrain = train; }
+            var mover = h.GetComponentInParent<MovingBlock>();
+            if (mover != null && h.attachedRigidbody == mover.Body) groundVelocity += mover.Velocity;
+            var seesaw = h.GetComponentInParent<Seesaw>();
+            if (seesaw != null && h.attachedRigidbody == seesaw.Plank) GroundSeesaw = seesaw;
             var crumble = h.GetComponent<Crumble>();
             if (crumble != null) crumble.Touch();
         }
@@ -335,7 +342,7 @@ public class Zombie : MonoBehaviour
 
         Vector2 center = Position + Vector2.up * 0.5f;
         Fx.Burst(center, new Color(0.55f, 0.08f, 0.1f), 14, 7f, 0.16f);
-        Fx.Burst(center, Art.PlayerColors[Index % 4], 8, 6f, 0.14f);
+        Fx.Burst(center, Art.PlayerColor(Index), 8, 6f, 0.14f);
         var corpse = Fx.Spawn(sr.sprite, Position, Color.white, 1f, 15);
         corpse.GetComponent<SpriteRenderer>().flipX = sr.flipX;
         corpse.Velocity = new Vector2(Random.Range(-3f, 3f), 11f);
@@ -356,7 +363,7 @@ public class Zombie : MonoBehaviour
         State = ZombieState.Finished;
         if (DemoDriver.Active) Debug.Log($"[Demo] P{Index + 1} chegou no cérebro");
         Fx.Burst(Level.GoalPosition, new Color(1f, 0.6f, 0.75f), 18, 6f, 0.16f, 8f);
-        Fx.Burst(Level.GoalPosition, Art.PlayerColors[Index % 4], 12, 5f, 0.14f, 8f);
+        Fx.Burst(Level.GoalPosition, Art.PlayerColor(Index), 12, 5f, 0.14f, 8f);
         Sfx.Play("goal");
         if (GameManager.Instance != null) GameManager.Instance.OnZombieFinished(this);
         gameObject.SetActive(false);

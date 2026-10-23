@@ -261,10 +261,21 @@ public partial class GameManager
 
     bool Button(float x, float y, float w, float h, string label) => GUI.Button(R(x, y, w, h), label, buttonStyle);
 
+    /// <summary>No cliente online: o ping até o host no canto de baixo (verde bom, amarelo ok, vermelho ruim).</summary>
+    void DrawPing()
+    {
+        var net = NetGame.Instance;
+        if (!Replica || net == null || net.PingMs <= 0) return;
+        int ms = net.PingMs;
+        Color c = ms < 90 ? new Color(0.55f, 1f, 0.45f) : ms < 180 ? new Color(1f, 0.85f, 0.35f) : new Color(1f, 0.45f, 0.4f);
+        Text(R(14, 1050, 260, 28), $"ping {ms} ms", 17, c, TextAnchor.MiddleLeft);
+    }
+
     void DrawOnline()
     {
         var net = NetGame.Instance;
         onlineTextFocused = false;
+        DrawPing();
         if (net == null || !NetGame.PanelOpen) return;
         if (buttonStyle == null)
         {

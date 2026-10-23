@@ -2,12 +2,12 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// A fase atual (32x18 células), montada a partir de um MapDef desenhado em texto.
+/// A fase atual (48x27 células), montada a partir de um MapDef desenhado em texto.
 /// Guarda também a grade de ocupação usada para posicionar itens e para as bombas.
 /// </summary>
 public static class Level
 {
-    public const int W = 32, H = 18;
+    public const int W = 48, H = 27;
     public static readonly Vector2 Origin = new Vector2(-W / 2f, -H / 2f);
 
     public static MapDef Map { get; private set; } = Maps.All[0];
@@ -85,8 +85,8 @@ public static class Level
             }
 
         // Limites invisíveis (paredes laterais e teto).
-        AddWall(new Vector2(Origin.x - 0.5f, 6f), new Vector2(1f, 40f));
-        AddWall(new Vector2(-Origin.x + 0.5f, 6f), new Vector2(1f, 40f));
+        AddWall(new Vector2(Origin.x - 0.5f, 0f), new Vector2(1f, H * 2f + 10f));
+        AddWall(new Vector2(-Origin.x + 0.5f, 0f), new Vector2(1f, H * 2f + 10f));
         AddWall(new Vector2(0f, -Origin.y + 0.5f), new Vector2(W + 2f, 1f));
 
         foreach (var t in map.Trains)
@@ -129,12 +129,12 @@ public static class Level
     {
         spawns.Clear();
         GoalCell = new Vector2Int(W - 3, 7);
-        var found = new Vector2Int?[4];
+        var found = new Vector2Int?[8];
         for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++)
             {
                 char ch = map.At(x, y);
-                if (ch >= '1' && ch <= '4') found[ch - '1'] = new Vector2Int(x, y);
+                if (ch >= '1' && ch <= '8') found[ch - '1'] = new Vector2Int(x, y);
                 else if (ch == 'G') GoalCell = new Vector2Int(x, y);
             }
         foreach (var f in found) if (f.HasValue) spawns.Add(f.Value);
@@ -330,16 +330,17 @@ public static class Level
         backgroundTheme = theme;
         background = new GameObject("Fundo").transform;
         var t = Art.Theme(theme);
+        const float k = W / 32f; // o fundo foi desenhado para a fase de 32x18: cresce junto com ela
 
-        Make("Ceu", Art.Sky(theme), new Vector2(0, 0), new Vector3(70f, 0.5f, 1f), Color.white, -100);
-        Make("Brilho da lua", Art.Glow, new Vector2(10.5f, 5.5f), Vector3.one * 2.4f, new Color(t.Moon.r, t.Moon.g, t.Moon.b, 0.22f), -99);
-        Make("Lua", Art.Moon, new Vector2(10.5f, 5.5f), Vector3.one, t.Moon, -98);
-        Make("Morros distantes", Art.Hills(1 + theme * 2, t.HillFar), new Vector2(0, -8.5f), new Vector3(1.4f, 2.0f, 1f), Color.white, -97);
-        Make("Morros", Art.Hills(2 + theme * 2, t.HillNear), new Vector2(2, -9.5f), new Vector3(1.3f, 1.5f, 1f), Color.white, -96);
+        Make("Ceu", Art.Sky(theme), new Vector2(0, 0), new Vector3(70f * k, 0.5f * k, 1f), Color.white, -100);
+        Make("Brilho da lua", Art.Glow, new Vector2(10.5f, 5.5f) * k, Vector3.one * 2.4f * k, new Color(t.Moon.r, t.Moon.g, t.Moon.b, 0.22f), -99);
+        Make("Lua", Art.Moon, new Vector2(10.5f, 5.5f) * k, Vector3.one * k, t.Moon, -98);
+        Make("Morros distantes", Art.Hills(1 + theme * 2, t.HillFar), new Vector2(0, -8.5f) * k, new Vector3(1.4f, 2.0f, 1f) * k, Color.white, -97);
+        Make("Morros", Art.Hills(2 + theme * 2, t.HillNear), new Vector2(2, -9.5f) * k, new Vector3(1.3f, 1.5f, 1f) * k, Color.white, -96);
 
-        var fog1 = Make("Neblina", Art.Fog, new Vector2(-6, -3.5f), new Vector3(2.4f, 1.6f, 1f), Color.white, -95);
+        var fog1 = Make("Neblina", Art.Fog, new Vector2(-6, -3.5f) * k, new Vector3(2.4f, 1.6f, 1f) * k, Color.white, -95);
         fog1.AddComponent<Spinner>().DriftX = 0.5f;
-        var fog2 = Make("Neblina", Art.Fog, new Vector2(14, -6f), new Vector3(3f, 1.4f, 1f), Color.white, 20);
+        var fog2 = Make("Neblina", Art.Fog, new Vector2(14, -6f) * k, new Vector3(3f, 1.4f, 1f) * k, Color.white, 20);
         fog2.AddComponent<Spinner>().DriftX = -0.35f;
     }
 

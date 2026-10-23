@@ -36,7 +36,9 @@ public class BotPlayer
     float BoldTime => Patience + 3f;
     const float GiveUpTime = 18f, GiveUpNoPathTime = 7f;
 
-    static bool IsBlock(ItemType t) => t == ItemType.Caixa || t == ItemType.Prancha || t == ItemType.Pedra || t == ItemType.Gelo || t == ItemType.CaixaPodre || t == ItemType.Esteira;
+    // a plataforma móvel não conta: os bots não sabem andar nela (o mapa deles ignora ela, como o trem)
+    static bool IsBlock(ItemType t) => t == ItemType.Caixa || t == ItemType.Prancha || t == ItemType.Pedra || t == ItemType.Gelo || t == ItemType.CaixaPodre || t == ItemType.Esteira ||
+                                       t == ItemType.Gangorra;
     static bool IsTrap(ItemType t) => t == ItemType.Espinhos || t == ItemType.Serra || t == ItemType.SerraMovel || t == ItemType.Canhao || t == ItemType.LancaChamas;
 
     static Vector2Int SpawnNode(PlayerSlot p) => NavGrid.NodeAt(Level.SpawnPoint(p.Index));
@@ -228,9 +230,11 @@ public class BotPlayer
         solids = new List<Rect>();
         hazards = new List<Rect>();
         blasted = def.Type == ItemType.Bomba ? ItemInstance.BlastVictims(c.Pivot) : null;
-        foreach (var cell in def.Cells)
+        // a plataforma móvel não entra no mapa dos bots (ela não fica onde foi colocada)
+        var cells = def.Type == ItemType.PlataformaMovel ? new Vector2Int[0] : ItemDefs.Footprint(def, c.Rotation);
+        foreach (var cell in cells)
         {
-            var w = Level.CellCenter(c.Pivot + ItemDefs.Rotate(cell, c.Rotation));
+            var w = Level.CellCenter(c.Pivot + cell);
             var r = new Rect(w.x - 0.5f, w.y - 0.5f, 1f, 1f);
             if (IsTrap(def.Type) && def.Type != ItemType.Canhao && def.Type != ItemType.LancaChamas)
                 hazards.Add(new Rect(r.x + 0.1f, r.y + 0.1f, 0.8f, 0.8f));

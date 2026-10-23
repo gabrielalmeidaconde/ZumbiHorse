@@ -6,9 +6,10 @@ using UnityEngine;
 public static class Msg
 {
     // host → cliente
-    public const byte Welcome = 1, Reject = 2, SpriteKey = 3, Objects = 4, Remove = 5, Sound = 6, Float = 7, Ui = 8;
+    public const byte Welcome = 1, Reject = 2, SpriteKey = 3, Objects = 4, Remove = 5, Sound = 6, Float = 7, Ui = 8,
+                      Bundle = 9, Pong = 10;
     // cliente → host
-    public const byte Hello = 20, Input = 21;
+    public const byte Hello = 20, Input = 21, Ping = 22;
 }
 
 /// <summary>
@@ -276,7 +277,7 @@ public class SceneMirror
     /// <summary>Anda um pouco em direção à última posição recebida (fica liso mesmo recebendo 20 vezes por segundo).</summary>
     public void Update(float dt)
     {
-        float k = 1f - Mathf.Exp(-dt * 22f);
+        float k = 1f - Mathf.Exp(-dt * 30f);
         settled.Clear();
         foreach (var o in moving)
         {

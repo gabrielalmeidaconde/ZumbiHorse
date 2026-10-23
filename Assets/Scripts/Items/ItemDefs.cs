@@ -1,6 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-public enum ItemType { Caixa, Prancha, Pedra, Espinhos, Serra, Canhao, Mola, Gelo, Bomba, SerraMovel, Portal, Esteira, LancaChamas, CaixaPodre, Ventilador }
+public enum ItemType { Caixa, Prancha, Pedra, Espinhos, Serra, Canhao, Mola, Gelo, Bomba, SerraMovel, Portal, Esteira, LancaChamas, CaixaPodre, Ventilador, PlataformaMovel, Gangorra }
 
 public class ItemDef
 {
@@ -13,6 +14,10 @@ public class ItemDef
     public Vector2 Center;
     public float Weight;
     public bool CanRotate = true;
+    /// <summary>O desenho não gira junto com a rotação (a plataforma móvel fica sempre na horizontal).</summary>
+    public bool KeepUpright;
+    /// <summary>Células por rotação, quando não é só girar as Cells (a plataforma móvel ocupa o trajeto).</summary>
+    public System.Func<int, Vector2Int[]> CellsFor;
 }
 
 public static class ItemDefs
@@ -34,9 +39,34 @@ public static class ItemDefs
         new ItemDef { Type = ItemType.Canhao, Name = "Canhão de Ossos", Hint = "Atira ossos", Cells = new[] { V(0, 0) }, Weight = 2f },
         new ItemDef { Type = ItemType.LancaChamas, Name = "Lança-Chamas", Hint = "Cospe fogo", Cells = new[] { V(0, 0) }, Weight = 2f },
         new ItemDef { Type = ItemType.Bomba, Name = "Bomba", Hint = "Explode blocos", Cells = new[] { V(0, 0) }, Weight = 1.5f, CanRotate = false },
+        new ItemDef { Type = ItemType.PlataformaMovel, Name = "Plataforma Móvel", Hint = "Vai e volta", Cells = MovingPlatformCells(0), CellsFor = MovingPlatformCells, Center = new Vector2(1.5f, 0f), KeepUpright = true, Weight = 2f },
+        new ItemDef { Type = ItemType.Gangorra, Name = "Gangorra", Hint = "Pesa e levanta", Cells = new[] { V(-2, 0), V(-1, 0), V(0, 0), V(1, 0), V(2, 0), V(0, -1) }, Center = new Vector2(0f, -0.5f), Weight = 1.5f, CanRotate = false },
     };
 
     static Vector2Int V(int x, int y) => new Vector2Int(x, y);
+
+    /// <summary>Células que o item ocupa com esta rotação, relativas à célula pivô.</summary>
+    public static Vector2Int[] Footprint(ItemDef def, int rotation)
+    {
+        if (def.CellsFor != null) return def.CellsFor(rotation);
+        var cells = new Vector2Int[def.Cells.Length];
+        for (int i = 0; i < cells.Length; i++) cells[i] = Rotate(def.Cells[i], rotation);
+        return cells;
+    }
+
+    /// <summary>Plataforma (3 de largura) mais todo o trajeto dela na direção da rotação.</summary>
+    static Vector2Int[] MovingPlatformCells(int rotation)
+    {
+        var d = Rotate(new Vector2Int(1, 0), rotation);
+        var cells = new List<Vector2Int>();
+        for (int s = 0; s <= MovingBlock.Travel; s++)
+            for (int x = -1; x <= 1; x++)
+            {
+                var c = new Vector2Int(x, 0) + d * s;
+                if (!cells.Contains(c)) cells.Add(c);
+            }
+        return cells.ToArray();
+    }
 
     public static ItemDef Get(ItemType t)
     {
