@@ -43,12 +43,22 @@ jobs:
           key: Library-${{ matrix.target }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: Library-${{ matrix.target }}-
 
+      - name: Limpar espaços e quebras de linha coladas sem querer no e-mail e na senha
+        env:
+          E: ${{ secrets.UNITY_EMAIL }}
+          P: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          e=$(printf '%s' "$E" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          p=$(printf '%s' "$P" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          echo "::add-mask::$e"
+          echo "::add-mask::$p"
+          echo "UNITY_EMAIL=$e" >> "$GITHUB_ENV"
+          echo "UNITY_PASSWORD=$p" >> "$GITHUB_ENV"
+
       - name: Build ${{ matrix.target }}
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: ${{ matrix.target }}
           buildMethod: ZumbiSetup.${{ matrix.method }}

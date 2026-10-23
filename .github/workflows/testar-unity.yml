@@ -1,0 +1,24 @@
+# Teste manual (aba Actions > "Testar secrets do Unity" > Run workflow): confere o formato de UNITY_EMAIL,
+# UNITY_PASSWORD e UNITY_LICENSE sem mostrar os valores. Não compila nada.
+name: Testar secrets do Unity
+
+on: workflow_dispatch
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir formato dos secrets
+        env:
+          E: ${{ secrets.UNITY_EMAIL }}
+          P: ${{ secrets.UNITY_PASSWORD }}
+          L: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          python3 - <<'PY'
+          import os
+          e, p, l = (os.environ.get(k, "") for k in ("E", "P", "L"))
+          sobra = lambda s: s != s.strip()
+          print(f"UNITY_EMAIL: {len(e)} caracteres | tem @: {'@' in e} | espaço/quebra de linha nas pontas: {sobra(e)}")
+          print(f"UNITY_PASSWORD: {len(p)} caracteres | espaço/quebra de linha nas pontas: {sobra(p)}")
+          print(f"UNITY_LICENSE: {len(l)} caracteres | parece um .ulf: {'<License' in l and '<Signature' in l}")
+          PY
