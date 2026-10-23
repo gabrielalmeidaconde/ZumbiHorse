@@ -66,8 +66,16 @@ public static class ZumbiSetup
     [MenuItem("Zumbi Horse/Build Windows", priority = 21)]
     public static void BuildWindows() => Build(BuildTarget.StandaloneWindows64, "Builds/Windows/ZumbiHorse.exe");
 
+    /// <summary>App universal (Mac Intel e Apple Silicon).</summary>
+    [MenuItem("Zumbi Horse/Build Mac", priority = 22)]
+    public static void BuildMac()
+    {
+        EditorUserBuildSettings.SetPlatformSettings(BuildPipeline.GetBuildTargetName(BuildTarget.StandaloneOSX), "Architecture", "x64ARM64");
+        Build(BuildTarget.StandaloneOSX, "Builds/Mac/ZumbiHorse.app");
+    }
+
     /// <summary>Versão para navegador (para jogar direto na página do itch.io).</summary>
-    [MenuItem("Zumbi Horse/Build WebGL (itch.io)", priority = 22)]
+    [MenuItem("Zumbi Horse/Build WebGL (itch.io)", priority = 23)]
     public static void BuildWebGL()
     {
         // o itch.io não manda o cabeçalho de compressão: com o fallback o próprio jogo descompacta no navegador

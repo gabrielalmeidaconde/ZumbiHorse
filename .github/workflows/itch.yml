@@ -1,0 +1,73 @@
+# A cada push na main: compila o jogo para navegador, Windows, Mac e Linux e publica no itch.io.
+# Precisa (em Settings > Secrets and variables > Actions):
+#   secrets   UNITY_LICENSE, UNITY_EMAIL, UNITY_PASSWORD  (licença do Unity, veja o README)
+#             BUTLER_API_KEY                               (chave de API do itch.io)
+#   variável  ITCH_GAME                                    (usuário/jogo no itch, ex.: fulano/ultimate-zumbi-horse)
+name: Publicar no itch.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: itch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.channel }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: WebGL,               method: BuildWebGL,   out: build/html5,                       channel: html5 }
+          - { target: StandaloneWindows64, method: BuildWindows, out: build/windows/ZumbiHorse.exe,      channel: windows }
+          - { target: StandaloneOSX,       method: BuildMac,     out: build/mac/ZumbiHorse.app,          channel: mac }
+          - { target: StandaloneLinux64,   method: BuildLinux,   out: build/linux/ZumbiHorse.x86_64,     channel: linux }
+
+    steps:
+      - name: Liberar espaço em disco (a imagem do Unity é grande)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - uses: actions/checkout@v4
+
+      - name: Cache da pasta Library (builds bem mais rápidos)
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ matrix.target }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: Library-${{ matrix.target }}-
+
+      - name: Build ${{ matrix.target }}
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: ${{ matrix.target }}
+          buildMethod: ZumbiSetup.${{ matrix.method }}
+          customParameters: -zumbiBuildPath ${{ matrix.out }}
+          versioning: None
+
+      - name: Publicar no itch.io (canal ${{ matrix.channel }})
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_GAME: ${{ vars.ITCH_GAME }}
+        run: |
+          if [ -z "$BUTLER_API_KEY" ] || [ -z "$ITCH_GAME" ]; then
+            echo "::warning::BUTLER_API_KEY ou ITCH_GAME não configurados: o build foi feito, mas não foi publicado."
+            exit 0
+          fi
+          export BUTLER_API_KEY=$(printf '%s' "$BUTLER_API_KEY" | tr -d '[:space:]') # chave colada com espaço/quebra de linha
+          dir=build/${{ matrix.channel }}
+          # arquivos de depuração do Burst não vão para os jogadores
+          sudo find "$dir" -maxdepth 1 -name '*_DoNotShip' -exec rm -rf {} +
+          curl -sSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler-bin && chmod +x butler-bin/butler
+          ./butler-bin/butler push "$dir" "$ITCH_GAME:${{ matrix.channel }}" --userversion "${{ github.run_number }}-${GITHUB_SHA::7}"

@@ -196,6 +196,25 @@ Não dá para colocar itens nas áreas de largada e de chegada (aparecem marcada
 
 No navegador, clique no jogo antes de jogar (para ele receber o teclado). Controles também funcionam no navegador.
 
+### Publicação automática (GitHub Actions)
+
+O arquivo `.github/workflows/itch.yml` faz isso sozinho a cada push na `main`: compila para navegador, Windows,
+Mac e Linux (com o [GameCI](https://game-ci.com)) e envia para o itch.io com o butler, nos canais
+`html5`, `windows`, `mac` e `linux`. Leva uns 15 a 30 minutos; o andamento aparece na aba **Actions** do GitHub.
+
+Configuração (uma vez só):
+
+1. Crie a página do jogo no itch.io (como rascunho) e anote o endereço: `usuario.itch.io/nome-do-jogo`.
+2. Gere uma chave em https://itch.io/user/settings/api-keys.
+3. No GitHub: **Settings > Secrets and variables > Actions**
+   - aba **Secrets**: `BUTLER_API_KEY` (a chave do itch), `UNITY_EMAIL` e `UNITY_PASSWORD` (sua conta Unity) e
+     `UNITY_LICENSE` (licença do Unity; siga "Personal License" em https://game-ci.com/docs/github/activation);
+   - aba **Variables**: `ITCH_GAME` = `usuario/nome-do-jogo`.
+4. Depois do primeiro envio, no itch.io (**Edit game > Uploads**), marque o arquivo `html5` como
+   *This file will be played in the browser* e ajuste o tamanho para 1280 x 720. Os envios seguintes mantêm isso.
+
+Sem a chave do itch, o workflow só compila (e avisa que não publicou).
+
 O projeto usa o pacote **Input System** (necessário para vários controles ao mesmo tempo).
 Se copiar os scripts para outro projeto sem esse pacote, só os dois lados do teclado funcionam.
 
