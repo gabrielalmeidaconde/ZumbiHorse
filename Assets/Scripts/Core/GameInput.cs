@@ -29,9 +29,9 @@ public class InputSource
     public bool RemoteAlive = true;
     public Vector2 RemoteMove;
     public bool RemoteJumpHeld;
-    /// <summary>Quadro em que cada botão foi apertado lá: pulo, confirmar, voltar, girar horário, anti-horário, pausar.</summary>
-    public readonly int[] RemotePressFrame = { -1, -1, -1, -1, -1, -1 };
-    public const int BtnJump = 0, BtnConfirm = 1, BtnBack = 2, BtnCW = 3, BtnCCW = 4, BtnPause = 5;
+    /// <summary>Quadro em que cada botão foi apertado lá: pulo, confirmar, voltar, girar horário, anti-horário, pausar, dançar.</summary>
+    public readonly int[] RemotePressFrame = { -1, -1, -1, -1, -1, -1, -1 };
+    public const int BtnJump = 0, BtnConfirm = 1, BtnBack = 2, BtnCW = 3, BtnCCW = 4, BtnPause = 5, BtnDance = 6;
 
     bool RemoteDown(int b) => RemotePressFrame[b] == Time.frameCount;
 
@@ -249,9 +249,25 @@ public class InputSource
         }
     }
 
+    /// <summary>Dancinha de emote.</summary>
+    public bool DanceDown
+    {
+        get
+        {
+            if (Remote) return RemoteDown(BtnDance);
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.F);
+                case DeviceKind.Keyboard2: return Down(K.Digit0);
+                case DeviceKind.Gamepad: return PadDown(2);
+                default: return false;
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O }
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Digit0 }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
@@ -280,6 +296,8 @@ public class InputSource
             case K.RightShift: return UnityEngine.InputSystem.Key.RightShift;
             case K.Backspace: return UnityEngine.InputSystem.Key.Backspace;
             case K.O: return UnityEngine.InputSystem.Key.O;
+            case K.F: return UnityEngine.InputSystem.Key.F;
+            case K.Digit0: return UnityEngine.InputSystem.Key.Digit0;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -328,6 +346,8 @@ public class InputSource
             case K.RightShift: return KeyCode.RightShift;
             case K.Backspace: return KeyCode.Backspace;
             case K.O: return KeyCode.O;
+            case K.F: return KeyCode.F;
+            case K.Digit0: return KeyCode.Alpha0;
             default: return KeyCode.Escape;
         }
     }

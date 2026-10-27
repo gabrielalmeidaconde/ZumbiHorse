@@ -14,7 +14,7 @@ public enum NetMode { Offline, Connecting, Host, Client }
 public class NetGame : MonoBehaviour
 {
     /// <summary>Muda quando as mensagens mudam: host e cliente precisam da mesma versão.</summary>
-    public const int Protocol = 4;
+    public const int Protocol = 5;
     const float SendInterval = 1f / 30f;
     const float PingInterval = 0.5f;
     const float ConnectTimeout = 20f;
@@ -401,7 +401,7 @@ public class NetGame : MonoBehaviour
             int pad = r.ReadByte();
             float mx = r.ReadSByte() / 127f, my = r.ReadSByte() / 127f;
             bool jumpHeld = r.ReadByte() != 0;
-            var c = r.ReadBytes(6);
+            var c = r.ReadBytes(7);
 
             if (!remote.TryGetValue((conn, devId), out var src))
             {
@@ -413,7 +413,7 @@ public class NetGame : MonoBehaviour
             src.RemoteMove = new Vector2(mx, my);
             src.RemoteJumpHeld = jumpHeld;
             var last = lastCounters[src];
-            for (int b = 0; b < 6; b++)
+            for (int b = 0; b < c.Length; b++)
                 if (c[b] != last[b]) src.RemotePressFrame[b] = Time.frameCount;
             lastCounters[src] = c;
         }
@@ -520,7 +520,7 @@ public class NetGame : MonoBehaviour
             {
                 devId = d == TestDevice ? 99 : d.Kind == DeviceKind.Keyboard1 ? 0 : d.Kind == DeviceKind.Keyboard2 ? 1 : 2 + localIds.Count;
                 localIds[d] = devId;
-                counters[d] = new byte[6];
+                counters[d] = new byte[7];
             }
             var c = counters[d];
             bool test = d == TestDevice;
@@ -532,6 +532,7 @@ public class NetGame : MonoBehaviour
                 if (d.RotateCWDown) c[InputSource.BtnCW]++;
                 if (d.RotateCCWDown) c[InputSource.BtnCCW]++;
                 if (d.PauseDown) c[InputSource.BtnPause]++;
+                if (d.DanceDown) c[InputSource.BtnDance]++;
             }
             Vector2 m = blocked && !test ? Vector2.zero : d.Move;
             w.Write((byte)devId);
