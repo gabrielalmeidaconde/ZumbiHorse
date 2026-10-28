@@ -181,7 +181,7 @@ public partial class GameManager : MonoBehaviour
             if (!canDance) { p.Dance = -1; continue; }
             if (!Listening(p.Input)) continue;
             var i = p.Input;
-            if (i.DanceDown) p.Dance = p.LastDance = (p.LastDance + 1) % Art.DanceCount;
+            if (i.DanceDown) p.Dance = p.LastDance = Art.RandomDance(p.LastDance);
             else if (i.Move.sqrMagnitude > 0.25f || i.ConfirmDown || i.BackDown) p.Dance = -1;
         }
     }
@@ -723,7 +723,7 @@ public partial class GameManager : MonoBehaviour
         ComputeScores();
         // bots que pontuaram chegando no cérebro às vezes comemoram no placar
         foreach (var p in Players)
-            if (p.IsBot && p.Score > p.PrevScore && finishOrder.Contains(p.Index) && Random.value < 0.5f) p.Dance = Random.Range(0, Art.DanceCount);
+            if (p.IsBot && p.Score > p.PrevScore && finishOrder.Contains(p.Index) && Random.value < 0.5f) p.Dance = Art.RandomDance();
         SetPhase(Phase.Score);
     }
 
@@ -888,7 +888,7 @@ public partial class GameManager : MonoBehaviour
     static string BackKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q]" : i.Kind == DeviceKind.Keyboard2 ? "[BACKSPACE]" : "{B}";
     static string RotateKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q] [E]" : i.Kind == DeviceKind.Keyboard2 ? "[CTRL] [SHIFT]" : "{LB} {RB}";
     const string AnyConfirm = "[ESPAÇO] [ENTER] {A}";
-    const string AnyDance = "[F] [0] {X}";
+    const string AnyDance = "[F] [.] {X}";
 
     static readonly string[] DeviceTitles = { "TECLADO  ·  WASD", "TECLADO  ·  SETAS", "CONTROLE" };
     static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar" };
@@ -900,7 +900,7 @@ public partial class GameManager : MonoBehaviour
         { "[Q] [E]", "[CTRL] [SHIFT] direitos", "{LB} {RB} ou {X} {Y}" },
         { "[Q]", "[BACKSPACE]", "{B}" },
         { "[ESC]", "[ESC]", "{START}" },
-        { "[F]", "[0]", "{X}" },
+        { "[F]", "[.]", "{X}" },
     };
 
     static readonly Color CapEdge = new Color(0.04f, 0.03f, 0.07f), CapFace = new Color(0.93f, 0.91f, 0.97f),

@@ -258,7 +258,7 @@ public class InputSource
             switch (Kind)
             {
                 case DeviceKind.Keyboard1: return Down(K.F);
-                case DeviceKind.Keyboard2: return Down(K.Digit0);
+                case DeviceKind.Keyboard2: return Down(K.Period) || Down(K.NumPeriod);
                 case DeviceKind.Gamepad: return PadDown(2);
                 default: return false;
             }
@@ -267,7 +267,7 @@ public class InputSource
 
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Digit0 }
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
@@ -297,7 +297,8 @@ public class InputSource
             case K.Backspace: return UnityEngine.InputSystem.Key.Backspace;
             case K.O: return UnityEngine.InputSystem.Key.O;
             case K.F: return UnityEngine.InputSystem.Key.F;
-            case K.Digit0: return UnityEngine.InputSystem.Key.Digit0;
+            case K.Period: return UnityEngine.InputSystem.Key.Period;
+            case K.NumPeriod: return UnityEngine.InputSystem.Key.NumpadPeriod;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -347,7 +348,8 @@ public class InputSource
             case K.Backspace: return KeyCode.Backspace;
             case K.O: return KeyCode.O;
             case K.F: return KeyCode.F;
-            case K.Digit0: return KeyCode.Alpha0;
+            case K.Period: return KeyCode.Period;
+            case K.NumPeriod: return KeyCode.KeypadPeriod;
             default: return KeyCode.Escape;
         }
     }

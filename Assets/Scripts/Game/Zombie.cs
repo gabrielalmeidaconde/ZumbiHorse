@@ -115,8 +115,7 @@ public class Zombie : MonoBehaviour
         if (ControlsEnabled && Controls != null && Controls.JumpDown) jumpBufferTimer = JumpBufferTime;
         if (ControlsEnabled && Controls != null && Controls.DanceDown && grounded)
         {
-            lastDance = (lastDance + 1) % Art.DanceCount;
-            dance = lastDance;
+            dance = lastDance = Art.RandomDance(lastDance);
             danceTime = 0f;
         }
         Animate(Time.deltaTime);
