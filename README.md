@@ -59,6 +59,30 @@ No lobby, qualquer jogador troca o mapa com **esquerda/direita** (A/D, setas ou 
 
 Não dá para colocar itens no trilho do trem (área marcada durante o posicionamento).
 
+## Criador de fases e desafios
+
+No lobby, aperte **C** (teclado), **Select** (controle) ou clique em **CRIAR FASE** (só no jogo offline).
+Dá para montar a fase com qualquer teclado, controle ou mouse:
+
+| Ação | Teclado | Controle | Mouse |
+|---|---|---|---|
+| Mover o cursor | WASD ou setas | Analógico / D-pad | Apontar |
+| Pintar (segure e ande para pintar vários) | Espaço / Enter | A | Botão esquerdo |
+| Trocar a peça | Q / E ou Ctrl / Shift direitos | LB / RB | Rodinha ou clicar na barra |
+| Apagar | peça "Apagar" | peça "Apagar" | Botão direito |
+| Menu (testar, copiar código, tema, sair) | Esc | Start | Botão MENU |
+
+- Peças: terra, pedra, gelo, trilho, ácido, espinhos, serra, serra móvel (marque o começo e o fim),
+  largada, cérebro, lápide e árvore. Trilho reto com 7 células ou mais ganha um trem sozinho.
+- São 6 fases salvas no computador, e cada mudança é salva na hora.
+- Para compartilhar, passe na fase em **TESTAR**: o seu melhor tempo vai junto no código. Depois use
+  **COPIAR CÓDIGO DO DESAFIO** e cole o código (começa com `ZH1-`) numa conversa. Qualquer mudança na fase pede
+  um teste novo.
+- O amigo copia o código e escolhe **COLAR CÓDIGO DE DESAFIO** no criador: é uma corrida solo contra o relógio
+  (morreu, volta para a largada e o tempo continua) para tentar bater o tempo de quem criou.
+- Na versão de navegador, copiar e colar abre uma caixinha do próprio navegador quando ele não deixa usar a
+  área de transferência direto.
+
 ## Pontuação
 
 | Situação | Pontos |
@@ -243,11 +267,14 @@ Assets/
       Art.cs             pixel art procedural (zumbis, blocos, armadilhas, cenário)
       Sfx.cs             efeitos sonoros sintetizados
       FxParticle.cs      partículas, poeira, explosões
+      Clipboard.cs       copiar/colar (no navegador usa Plugins/WebGL/Clipboard.jslib)
       Spinner.cs         gira/balança/desliza objetos
     Game/
       GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
       GameManager.Net.cs modo cópia do cliente online, estado da interface pela rede, painel online
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
+      MapCode.cs         fases criadas: código de compartilhar, espaços salvos e trens automáticos
+      GameManager.Editor.cs  criador de fases e desafio solo contra o relógio
       Level.cs           monta a fase a partir do mapa, grade de ocupação, fundo
       Train.cs           trem fantasma (vai e volta, carona no teto, pontas mortais)
       Bots/              IA dos bots: NavGrid (mapa de navegação e simulação de pulos),
