@@ -158,6 +158,25 @@ public class InputSource
         }
     }
 
+    /// <summary>Confirmar segurado (no criador de fases: pintar enquanto anda).</summary>
+    public bool ConfirmHeld
+    {
+        get
+        {
+            if (Remote) return false;
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Held(K.Space);
+                case DeviceKind.Keyboard2: return Held(K.Enter) || Held(K.NumEnter);
+                case DeviceKind.Gamepad: return PadHeld(0);
+                default: return false;
+            }
+        }
+    }
+
+    /// <summary>Botão Select (View) do controle: abre o criador de fases no lobby.</summary>
+    public bool SelectDown => !Remote && PadDown(7);
+
     /// <summary>Girar o item no sentido horário.</summary>
     public bool RotateCWDown
     {
@@ -251,11 +270,13 @@ public class InputSource
 
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O }
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, C }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
     public static bool EscapeKeyDown => Down(K.Escape);
+    /// <summary>Tecla C: abre o criador de fases no lobby.</summary>
+    public static bool CreatorKeyDown => Down(K.C);
 
 #if ENABLE_INPUT_SYSTEM
     static UnityEngine.InputSystem.Key Map(K k)
@@ -280,6 +301,7 @@ public class InputSource
             case K.RightShift: return UnityEngine.InputSystem.Key.RightShift;
             case K.Backspace: return UnityEngine.InputSystem.Key.Backspace;
             case K.O: return UnityEngine.InputSystem.Key.O;
+            case K.C: return UnityEngine.InputSystem.Key.C;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -287,7 +309,7 @@ public class InputSource
     static bool Held(K k) => Keyboard.current != null && Keyboard.current[Map(k)].isPressed;
     static bool Down(K k) => Keyboard.current != null && Keyboard.current[Map(k)].wasPressedThisFrame;
 
-    // 0 A(sul) 1 B(leste) 2 X(oeste) 3 Y(norte) 4 LB 5 RB 6 Start
+    // 0 A(sul) 1 B(leste) 2 X(oeste) 3 Y(norte) 4 LB 5 RB 6 Start 7 Select
     UnityEngine.InputSystem.Controls.ButtonControl PadButton(int b)
     {
         switch (b)
@@ -298,12 +320,22 @@ public class InputSource
             case 3: return Pad.buttonNorth;
             case 4: return Pad.leftShoulder;
             case 5: return Pad.rightShoulder;
-            default: return Pad.startButton;
+            case 6: return Pad.startButton;
+            default: return Pad.selectButton;
         }
     }
 
     bool PadHeld(int b) => Kind == DeviceKind.Gamepad && Connected && PadButton(b).isPressed;
     bool PadDown(int b) => Kind == DeviceKind.Gamepad && Connected && PadButton(b).wasPressedThisFrame;
+
+    public static bool HasMouse => Mouse.current != null;
+    /// <summary>Posição do mouse em pixels da tela (origem embaixo à esquerda).</summary>
+    public static Vector2 MousePosition => Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
+    /// <summary>Botão 0 = esquerdo, 1 = direito.</summary>
+    public static bool MouseHeld(int b) => Mouse.current != null && (b == 0 ? Mouse.current.leftButton : Mouse.current.rightButton).isPressed;
+    public static bool MouseDown(int b) => Mouse.current != null && (b == 0 ? Mouse.current.leftButton : Mouse.current.rightButton).wasPressedThisFrame;
+    /// <summary>Rodinha: +1 para cima, -1 para baixo, 0 parada.</summary>
+    public static int MouseScroll => Mouse.current != null ? System.Math.Sign(Mouse.current.scroll.ReadValue().y) : 0;
 #else
     // Fallback para o Input Manager antigo: só os dois lados do teclado (sem controles).
     static KeyCode Map(K k)
@@ -328,6 +360,7 @@ public class InputSource
             case K.RightShift: return KeyCode.RightShift;
             case K.Backspace: return KeyCode.Backspace;
             case K.O: return KeyCode.O;
+            case K.C: return KeyCode.C;
             default: return KeyCode.Escape;
         }
     }
@@ -336,6 +369,12 @@ public class InputSource
     static bool Down(K k) => Input.GetKeyDown(Map(k));
     bool PadHeld(int b) => false;
     bool PadDown(int b) => false;
+
+    public static bool HasMouse => Input.mousePresent;
+    public static Vector2 MousePosition => Input.mousePosition;
+    public static bool MouseHeld(int b) => Input.GetMouseButton(b);
+    public static bool MouseDown(int b) => Input.GetMouseButtonDown(b);
+    public static int MouseScroll => System.Math.Sign(Input.mouseScrollDelta.y);
 #endif
 
     // ------------------------------------------------------------------ dispositivos

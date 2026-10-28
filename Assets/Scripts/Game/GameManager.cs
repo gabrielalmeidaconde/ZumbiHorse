@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory }
+public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge }
 
 public class PlayerSlot
 {
@@ -140,9 +140,16 @@ public partial class GameManager : MonoBehaviour
     void LateUpdate()
     {
         if (cam == null) return;
-        cam.orthographicSize = Mathf.Max(Level.H / 2f + 0.4f, (Level.W / 2f + 0.3f) / Mathf.Max(0.1f, cam.aspect));
+        float size = Mathf.Max(Level.H / 2f + 0.4f, (Level.W / 2f + 0.3f) / Mathf.Max(0.1f, cam.aspect)), y = 0f;
+        if (EditorCamera)
+        {
+            // a fase cabe entre as barras do editor
+            size *= 1080f / (1080f - EditTopH - EditBottomH);
+            y = -(EditBottomH - EditTopH) / 1080f * size;
+        }
+        cam.orthographicSize = size;
         Vector2 off = shake > 0f ? Random.insideUnitCircle * shake : Vector2.zero;
-        cam.transform.position = new Vector3(off.x, off.y, -10f);
+        cam.transform.position = new Vector3(off.x, y + off.y, -10f);
         shake = Mathf.MoveTowards(shake, 0f, Time.unscaledDeltaTime * 1.5f);
     }
 
@@ -165,6 +172,8 @@ public partial class GameManager : MonoBehaviour
             case Phase.RoundEnd: UpdateRoundEnd(); break;
             case Phase.Score: UpdateScore(); break;
             case Phase.Victory: UpdateVictory(); break;
+            case Phase.Editor: UpdateCreator(); break;
+            case Phase.Challenge: UpdateChallenge(); break;
         }
         floats.RemoveAll(f => Time.time - f.Start > f.Duration);
     }
@@ -179,14 +188,15 @@ public partial class GameManager : MonoBehaviour
     /// <summary>Retorna true se o pause mudou neste quadro (para não repassar o mesmo botão).</summary>
     bool HandlePause()
     {
-        if (Phase == Phase.Lobby) return false;
+        if (Phase == Phase.Lobby || Phase == Phase.Editor) return false;
         var devices = ActiveDevices();
         bool toggle = devices.Any(d => d.PauseDown);
         if (paused)
         {
             if (devices.Any(d => d.BackDown))
             {
-                BackToLobby();
+                if (Phase == Phase.Challenge) { SetPaused(false); ExitChallenge(); }
+                else BackToLobby();
                 return true;
             }
             if (devices.Any(d => d.ConfirmDown)) toggle = true;
@@ -233,6 +243,9 @@ public partial class GameManager : MonoBehaviour
     void UpdateLobby()
     {
         var devices = ActiveDevices();
+        bool openCreator = creatorClicked || (InputSource.CreatorKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.SelectDown);
+        creatorClicked = false;
+        if (openCreator && CanCreate) { OpenCreator(); return; }
         foreach (var d in devices)
         {
             if (!d.ConfirmDown || Players.Any(p => p.Input.SameDevice(d))) continue;
@@ -845,6 +858,8 @@ public partial class GameManager : MonoBehaviour
             case Phase.RoundEnd: DrawTopBar("", -1f); DrawRun(); DrawRoundEnd(); break;
             case Phase.Score: DrawScore(); break;
             case Phase.Victory: DrawVictory(); break;
+            case Phase.Editor: DrawCreator(); break;
+            case Phase.Challenge: DrawChallenge(); break;
         }
 
         foreach (var f in floats)
@@ -1050,6 +1065,7 @@ public partial class GameManager : MonoBehaviour
             Text(R(0, 104, VW, 36), "Monte a fase, arme as armadilhas e seja o único zumbi a comer o cérebro!", 24, new Color(0.9f, 0.85f, 1f));
 
         DrawMapSelector(148f);
+        DrawCreatorButton(148f);
 
         // 8 lugares: 2 fileiras de 4 cartões (zumbi à esquerda, textos à direita)
         float gap = 24f, cw = Mathf.Min(360f, (VW - 80f - gap * 3) / 4f), ch = 166f;
@@ -1125,7 +1141,7 @@ public partial class GameManager : MonoBehaviour
         Keys(R(0, y, VW, 32), "BOTS:  [W] [^] ou CIMA adiciona  •  [S] [v] ou BAIXO tira  •  [E] [SHIFT] {RB} muda a dificuldade do último", 17, hint);
         Text(R(0, y + 32, VW, 28), $"Primeiro a fazer {WinScore} pontos vence.  Chegar no cérebro: +{PointsGoal}  •  Primeiro: +{PointsFirst}  •  Matar com sua armadilha: +{PointsTrap}  •  Se todos chegarem, ninguém pontua!", 18, new Color(0.65f, 0.95f, 0.6f));
         string pads = InputSource.GamepadsSupported ? $"Controles conectados: {InputSource.GamepadCount}" : "Input System não ativo: só teclado";
-        Keys(R(0, y + 60, VW, 26), pads + "   •   [ESC] {START} pausar (na partida)   •   [O] jogar online", 15, new Color(0.6f, 0.6f, 0.66f));
+        Keys(R(0, y + 60, VW, 26), pads + "   •   [ESC] {START} pausar (na partida)   •   [O] jogar online   •   [C] {SELECT} criar fase", 15, new Color(0.6f, 0.6f, 0.66f));
     }
 
     void DrawMapSelector(float y)
@@ -1155,6 +1171,39 @@ public partial class GameManager : MonoBehaviour
         Text(R(x + w - 58, y, 50, h), ">", 60, new Color(1f, 0.9f, 0.5f, pulse));
     }
 
+    /// <summary>Botão do criador de fases, à direita do seletor de mapa.</summary>
+    void DrawCreatorButton(float y)
+    {
+        float x = (VW + 980f) / 2f + 20f, w = Mathf.Min(300f, VW - x - 20f), h = 125f;
+        var r = R(x, y, w, h);
+        var e = Event.current;
+        if (CanCreate && e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition)) { creatorClicked = true; e.Use(); }
+        Fill(r, new Color(0.08f, 0.06f, 0.13f, 0.88f));
+        Fill(R(x, y, w, 4), new Color(0.55f, 0.92f, 0.4f));
+        Text(R(x, y + 10, w, 40), "CRIAR FASE", 28, CanCreate ? new Color(0.55f, 0.92f, 0.4f) : new Color(0.5f, 0.5f, 0.55f));
+        Text(R(x, y + 46, w, 30), CanCreate ? "e desafiar os amigos" : "só no jogo offline", 17, new Color(0.85f, 0.82f, 0.92f));
+        Keys(R(x, y + 82, w, 30), "[C] {SELECT} ou clique", 15, new Color(1f, 0.9f, 0.5f));
+    }
+
+    /// <summary>Cor de cada peça na miniatura e no criador de fases (null = não aparece na miniatura).</summary>
+    static Color? CellColor(char ch)
+    {
+        switch (ch)
+        {
+            case '#': return new Color(0.45f, 0.34f, 0.27f);
+            case 'S': return new Color(0.52f, 0.5f, 0.6f);
+            case 'i': return new Color(0.65f, 0.86f, 0.97f);
+            case '=': return new Color(0.62f, 0.46f, 0.3f);
+            case 'a': return new Color(0.4f, 0.85f, 0.3f);
+            case '^': return new Color(0.85f, 0.85f, 0.92f);
+            case 'X': return new Color(0.95f, 0.3f, 0.3f);
+            case 'p': return new Color(0.7f, 0.7f, 0.8f);
+            case 'G': return new Color(1f, 0.55f, 0.72f);
+            case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': return Art.PlayerColor(ch - '1');
+            default: return null;
+        }
+    }
+
     /// <summary>Miniatura do mapa desenhada célula por célula.</summary>
     void DrawMapThumbnail(MapDef map, float x, float y, float cell)
     {
@@ -1162,23 +1211,8 @@ public partial class GameManager : MonoBehaviour
         for (int cy = 0; cy < Level.H; cy++)
             for (int cx = 0; cx < Level.W; cx++)
             {
-                char ch = map.At(cx, cy);
-                Color c;
-                switch (ch)
-                {
-                    case '#': c = new Color(0.45f, 0.34f, 0.27f); break;
-                    case 'S': c = new Color(0.52f, 0.5f, 0.6f); break;
-                    case 'i': c = new Color(0.65f, 0.86f, 0.97f); break;
-                    case '=': c = new Color(0.62f, 0.46f, 0.3f); break;
-                    case 'a': c = new Color(0.4f, 0.85f, 0.3f); break;
-                    case '^': c = new Color(0.85f, 0.85f, 0.92f); break;
-                    case 'X': c = new Color(0.95f, 0.3f, 0.3f); break;
-                    case 'p': c = new Color(0.7f, 0.7f, 0.8f); break;
-                    case 'G': c = new Color(1f, 0.55f, 0.72f); break;
-                    case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': c = Art.PlayerColor(ch - '1'); break;
-                    default: continue;
-                }
-                Fill(R(x + cx * cell, y + (Level.H - 1 - cy) * cell, cell, cell), c);
+                var c = CellColor(map.At(cx, cy));
+                if (c.HasValue) Fill(R(x + cx * cell, y + (Level.H - 1 - cy) * cell, cell, cell), c.Value);
             }
         foreach (var sp in map.Saws)
         {
@@ -1419,7 +1453,7 @@ public partial class GameManager : MonoBehaviour
         Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.72f));
         Text(R(0, 110, VW, 110), "PAUSADO", 84, Color.white);
         Keys(R(0, 228, VW, 46), $"[ESC] {{START}} ou {AnyConfirm}  continuar", 26, new Color(0.6f, 1f, 0.5f));
-        Keys(R(0, 280, VW, 46), "[Q] [BACKSPACE] {B}  sair para o lobby", 26, new Color(1f, 0.6f, 0.5f));
+        Keys(R(0, 280, VW, 46), Phase == Phase.Challenge ? "[Q] [BACKSPACE] {B}  sair do desafio" : "[Q] [BACKSPACE] {B}  sair para o lobby", 26, new Color(1f, 0.6f, 0.5f));
         float h = DrawControls(350f);
         Text(R(0, 350 + h + 20, VW, 36), "Dicas: segure o pulo para ir mais alto  •  encoste na parede e pule para escalar  •  o primeiro a chegar ganha +1", 21, new Color(0.78f, 0.76f, 0.86f));
     }
