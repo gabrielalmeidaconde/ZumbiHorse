@@ -92,9 +92,13 @@ A partida começa quando pelo menos 2 jogadores estão prontos. Funciona com qua
 | Trocar mapa (no lobby) | A / D | Esquerda / Direita | Analógico / D-pad |
 | Voltar / sair do lobby | Q | Backspace | B |
 | Pausar | Esc | Esc | Start |
+| Dançar (de novo: sorteia outra dança) | F | . (do teclado numérico ou ao lado da vírgula) | X |
 
 Com o jogo pausado: CONFIRMAR continua e VOLTAR sai para o lobby.
 O zumbi também desliza e pula na parede.
+Dá para dançar no lobby, no placar e na corrida (parado no chão). O zumbi dança sem parar até andar, pular ou morrer,
+e cada aperto sorteia outra dança das raças do World of Warcraft (26 no total: a masculina e a feminina de cada raça).
+Os bots às vezes comemoram dançando no placar quando chegam no cérebro.
 
 O lobby e a tela de pausa mostram uma tabela com os controles de cada tipo de dispositivo (a coluna de quem
 está jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor

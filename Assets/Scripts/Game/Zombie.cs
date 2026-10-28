@@ -33,7 +33,8 @@ public class Zombie : MonoBehaviour
     Transform visual;
     Sprite[] frames;
 
-    float coyoteTimer, jumpBufferTimer, controlLockTimer, springCooldown, animTime;
+    float coyoteTimer, jumpBufferTimer, controlLockTimer, springCooldown, animTime, danceTime;
+    int dance = -1, lastDance = -1;   // dança atual (-1 = não está dançando)
     bool grounded, wasGrounded, jumpCut;
     int wallDir;
     bool onIce;
@@ -112,6 +113,11 @@ public class Zombie : MonoBehaviour
     {
         if (State != ZombieState.Alive) return;
         if (ControlsEnabled && Controls != null && Controls.JumpDown) jumpBufferTimer = JumpBufferTime;
+        if (ControlsEnabled && Controls != null && Controls.DanceDown && grounded)
+        {
+            dance = lastDance = Art.RandomDance(lastDance);
+            danceTime = 0f;
+        }
         Animate(Time.deltaTime);
     }
 
@@ -382,6 +388,19 @@ public class Zombie : MonoBehaviour
             else if (move.x < -0.25f) faceRight = false;
         }
         else if (Mathf.Abs(v.x) > 0.5f) faceRight = v.x > 0f;
+
+        // dança sem parar até andar ou sair do chão (pular, mola, vento...)
+        if (Mathf.Abs(move.x) > 0.25f || !grounded) dance = -1;
+        if (dance >= 0)
+        {
+            danceTime += dt;
+            sr.sprite = Art.DanceSprite(Index, dance, danceTime);
+            sr.flipX = !faceRight;
+            squash = Vector3.Lerp(squash, Vector3.one, dt * 12f);
+            visual.localScale = squash;
+            visual.localRotation = Quaternion.identity;
+            return;
+        }
 
         int frame;
         if (!grounded) frame = v.y > 0f ? 6 : 7;

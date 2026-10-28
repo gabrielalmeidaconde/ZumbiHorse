@@ -19,6 +19,8 @@ public class PlayerSlot
     public BotPlayer Bot;              // null = jogador humano
     public bool IsBot => Bot != null;
     public int Kills;
+    public int Dance = -1, LastDance = -1;   // dança no lobby/placar (-1 = parado)
+    public bool Dancing => Dance >= 0;
     public readonly List<KeyValuePair<string, int>> RoundPoints = new List<KeyValuePair<string, int>>();
 
     // O que a interface mostra. No host vem dos objetos (RefreshViews); no cliente online vem da rede.
@@ -166,7 +168,22 @@ public partial class GameManager : MonoBehaviour
             case Phase.Score: UpdateScore(); break;
             case Phase.Victory: UpdateVictory(); break;
         }
+        UpdateDances();
         floats.RemoveAll(f => Time.time - f.Start > f.Duration);
+    }
+
+    /// <summary>Dancinha no lobby e no placar (na corrida quem dança é o próprio zumbi).</summary>
+    void UpdateDances()
+    {
+        bool canDance = Phase == Phase.Lobby || Phase == Phase.Score;
+        foreach (var p in Players)
+        {
+            if (!canDance) { p.Dance = -1; continue; }
+            if (!Listening(p.Input)) continue;
+            var i = p.Input;
+            if (i.DanceDown) p.Dance = p.LastDance = Art.RandomDance(p.LastDance);
+            else if (i.Move.sqrMagnitude > 0.25f || i.ConfirmDown || i.BackDown) p.Dance = -1;
+        }
     }
 
     void SetPhase(Phase p)
@@ -704,6 +721,9 @@ public partial class GameManager : MonoBehaviour
         if (PhaseTime < 1.4f) return;
         Projectile.ClearAll();
         ComputeScores();
+        // bots que pontuaram chegando no cérebro às vezes comemoram no placar
+        foreach (var p in Players)
+            if (p.IsBot && p.Score > p.PrevScore && finishOrder.Contains(p.Index) && Random.value < 0.5f) p.Dance = Art.RandomDance();
         SetPhase(Phase.Score);
     }
 
@@ -868,9 +888,10 @@ public partial class GameManager : MonoBehaviour
     static string BackKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q]" : i.Kind == DeviceKind.Keyboard2 ? "[BACKSPACE]" : "{B}";
     static string RotateKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q] [E]" : i.Kind == DeviceKind.Keyboard2 ? "[CTRL] [SHIFT]" : "{LB} {RB}";
     const string AnyConfirm = "[ESPAÇO] [ENTER] {A}";
+    const string AnyDance = "[F] [.] {X}";
 
     static readonly string[] DeviceTitles = { "TECLADO  ·  WASD", "TECLADO  ·  SETAS", "CONTROLE" };
-    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar" };
+    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar" };
     static readonly string[,] ControlKeys =
     {
         { "[W] [A] [S] [D]", "[<] [^] [v] [>]", "{ANALÓGICO} ou {D-PAD}" },
@@ -879,6 +900,7 @@ public partial class GameManager : MonoBehaviour
         { "[Q] [E]", "[CTRL] [SHIFT] direitos", "{LB} {RB} ou {X} {Y}" },
         { "[Q]", "[BACKSPACE]", "{B}" },
         { "[ESC]", "[ESC]", "{START}" },
+        { "[F]", "[.]", "{X}" },
     };
 
     static readonly Color CapEdge = new Color(0.04f, 0.03f, 0.07f), CapFace = new Color(0.93f, 0.91f, 0.97f),
@@ -996,7 +1018,7 @@ public partial class GameManager : MonoBehaviour
     float DrawControls(float y)
     {
         float tw = Mathf.Min(VW - 60f, 1560f), x0 = (VW - tw) / 2f;
-        float labelW = 200f, colW = (tw - labelW) / 3f, headH = 42f, rowH = 37f;
+        float labelW = 200f, colW = (tw - labelW) / 3f, headH = 42f, rowH = 33f;
         int rows = ControlActions.Length;
         float h = headH + rows * rowH + 8f;
         Fill(R(x0, y, tw, h), new Color(0.08f, 0.06f, 0.13f, 0.9f));
@@ -1093,9 +1115,13 @@ public partial class GameManager : MonoBehaviour
                 continue;
             }
 
-            int f = slot.Ready ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
-            float hop = slot.Ready ? Mathf.Abs(Mathf.Sin(Time.time * 8f)) * 8f : 0f;
-            DrawSprite(new Rect(sprite.x, sprite.y - hop * S, sprite.width, sprite.height), frames[f], Color.white, slot.Ready && (int)(Time.time * 2f) % 2 == 0);
+            if (slot.Dancing) DrawSprite(sprite, Art.DanceSprite(i, slot.Dance, Time.time), Color.white);
+            else
+            {
+                int f = slot.Ready ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
+                float hop = slot.Ready ? Mathf.Abs(Mathf.Sin(Time.time * 8f)) * 8f : 0f;
+                DrawSprite(new Rect(sprite.x, sprite.y - hop * S, sprite.width, sprite.height), frames[f], Color.white, slot.Ready && (int)(Time.time * 2f) % 2 == 0);
+            }
             Text(R(tx, y0 + 46, tw, 26), DeviceLabel(slot), 17, new Color(0.85f, 0.85f, 0.9f), TextAnchor.MiddleLeft);
             if (slot.Ready)
             {
@@ -1352,7 +1378,9 @@ public partial class GameManager : MonoBehaviour
             var frames = Art.ZombieFrames(p.Index);
             bool scored = p.Score > p.PrevScore;
             int fr = scored ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
-            DrawSprite(R(barX - 130 - 90 * k, y - 10 * k, 90 * k, 100 * k), frames[fr], Color.white);
+            var zr = R(barX - 130 - 90 * k, y - 10 * k, 90 * k, 100 * k);
+            if (p.Dancing) DrawSprite(zr, Art.DanceSprite(p.Index, p.Dance, Time.time), Color.white);
+            else DrawSprite(zr, frames[fr], Color.white);
             Text(R(barX - 120, y, 110, 80 * k), p.Name, Sz(40, 22), p.Color, TextAnchor.MiddleLeft);
             if (p.IsBot) Text(R(barX - 120, y + 52 * k, 110, 30 * k), "CPU " + p.Bot.Label, Sz(16, 12), p.Bot.LabelColor, TextAnchor.MiddleLeft);
 
@@ -1382,7 +1410,7 @@ public partial class GameManager : MonoBehaviour
         if (PhaseTime > 1.6f)
         {
             float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 5f);
-            Keys(R(0, 960, VW, 50), $"{AnyConfirm}  continuar", 28, new Color(1f, 0.9f, 0.5f, blink));
+            Keys(R(0, 960, VW, 50), $"{AnyConfirm}  continuar   •   {AnyDance}  dançar", 28, new Color(1f, 0.9f, 0.5f, blink));
         }
     }
 
