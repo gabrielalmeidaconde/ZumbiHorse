@@ -21,6 +21,7 @@ public class Zombie : MonoBehaviour
     public const float Width = 0.6f, Height = 0.95f;
 
     public int Index;
+    public int Skin;   // visual escolhido no lobby (Art.SkinName)
     public InputSource Controls;
     public ZombieState State = ZombieState.Alive;
     public bool ControlsEnabled = true;
@@ -57,14 +58,15 @@ public class Zombie : MonoBehaviour
     /// <summary>Gangorra embaixo dos pés (ela usa isso para saber o peso de cada lado), ou null.</summary>
     public Seesaw GroundSeesaw { get; private set; }
 
-    public static Zombie Spawn(int index, InputSource controls, Vector2 pos)
+    public static Zombie Spawn(int index, int skin, InputSource controls, Vector2 pos)
     {
         var go = new GameObject($"Zumbi P{index + 1}");
         go.transform.position = pos;
         var z = go.AddComponent<Zombie>();
         z.Index = index;
+        z.Skin = skin;
         z.Controls = controls;
-        z.frames = Art.ZombieFrames(index);
+        z.frames = Art.ZombieFrames(index, skin);
         z.Build();
         foreach (var other in All)
             if (other != null && other != z) Physics2D.IgnoreCollision(z.body, other.body, true);
@@ -394,7 +396,7 @@ public class Zombie : MonoBehaviour
         if (dance >= 0)
         {
             danceTime += dt;
-            sr.sprite = Art.DanceSprite(Index, dance, danceTime);
+            sr.sprite = Art.DanceSprite(Index, Skin, dance, danceTime);
             sr.flipX = !faceRight;
             squash = Vector3.Lerp(squash, Vector3.one, dt * 12f);
             visual.localScale = squash;

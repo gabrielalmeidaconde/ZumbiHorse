@@ -117,6 +117,7 @@ A partida começa quando pelo menos 2 jogadores estão prontos. Funciona com qua
 | Voltar / sair do lobby | Q | Backspace | B |
 | Pausar | Esc | Esc | Start |
 | Dançar (de novo: sorteia outra dança) | F | . (do teclado numérico ou ao lado da vírgula) | X |
+| Trocar o visual do zumbi (no lobby) | R | Ctrl direito | LB |
 
 Com o jogo pausado: CONFIRMAR continua e VOLTAR sai para o lobby.
 O zumbi também desliza e pula na parede.
@@ -127,6 +128,28 @@ Os bots às vezes comemoram dançando no placar quando chegam no cérebro.
 O lobby e a tela de pausa mostram uma tabela com os controles de cada tipo de dispositivo (a coluna de quem
 está jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
 mostra os botões daquele jogador, e nas duas primeiras corridas aparece um lembrete de como pular.
+
+## Visuais dos zumbis
+
+No lobby, cada jogador troca o visual do seu zumbi com **R** (teclado WASD), **Ctrl direito** (teclado setas) ou
+**LB** (controle); o nome do visual aparece embaixo do zumbi. São 10 visuais, e todos guardam a cor do jogador em
+alguma parte para dar para saber quem é quem:
+
+| Visual | Como é | Onde fica a cor do jogador |
+|---|---|---|
+| Clássico | O zumbi de sempre: cabelo, camisa e calça | Camisa |
+| Esqueleto | Caveira, costelas e ossos | Cachecol e olhos brilhando |
+| Faraó | Múmia enfaixada com colar de ouro | Listras do toucado de faraó |
+| Pirata | Chapéu de três pontas com caveira e tapa-olho | Listras da camisa |
+| Astronauta | Capacete de vidro, traje branco e mochila | Painel do peito e cinto |
+| Vampiro | Cabelo lambido, presas e terno preto | Capa |
+| Palhaço | Careca com chapéu de festa e nariz vermelho | Cabelo e roupa de bolinhas |
+| Craque | Faixa na testa e calção branco | Camisa listrada de time |
+| Cavalo | Máscara de cavalo | Crina e camisa |
+| Punk | Brinco e jaqueta de couro com tachas | Moicano e camiseta |
+
+O visual escolhido fica salvo no computador para aquele lugar (P1, P2...). Os bots ganham um visual sorteado.
+No online, cada jogador troca o seu do mesmo jeito, no lobby do host.
 
 ## Multiplayer online
 
@@ -264,7 +287,7 @@ Assets/
     Bootstrap.cs         cria o GameManager se a cena não tiver um
     Core/
       GameInput.cs       InputSource: teclado WASD, teclado setas, controles (Input System)
-      Art.cs             pixel art procedural (zumbis, blocos, armadilhas, cenário)
+      Art.cs             pixel art procedural (zumbis e seus visuais, blocos, armadilhas, cenário)
       Sfx.cs             efeitos sonoros sintetizados
       FxParticle.cs      partículas, poeira, explosões
       Clipboard.cs       copiar/colar (no navegador usa Plugins/WebGL/Clipboard.jslib)

@@ -156,6 +156,7 @@ public partial class GameManager
             w.Write((byte)(p.Input.Remote ? p.Input.RemoteConn : 0));
             w.Write((byte)((p.Ready ? 1 : 0) | (p.Picked ? 2 : 0) | (p.Placed ? 4 : 0) | (p.IsBot ? 8 : 0) | (p.HeldSecondPortal ? 16 : 0)));
             w.Write((sbyte)p.Dance);
+            w.Write((byte)p.Skin);
             w.Write((short)p.Score);
             w.Write((short)p.PrevScore);
             w.Write(p.JoinFrame);
@@ -215,6 +216,7 @@ public partial class GameManager
             p.Placed = (f & 4) != 0;
             p.HeldSecondPortal = (f & 16) != 0;
             p.Dance = r.ReadSByte();
+            p.Skin = r.ReadByte();
             p.Score = r.ReadInt16();
             p.PrevScore = r.ReadInt16();
             p.JoinFrame = r.ReadInt32();
