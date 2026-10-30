@@ -365,7 +365,7 @@ public partial class GameManager
         challengeDone = false;
         respawnTimer = -1f;
         if (challengeInput == null || !challengeInput.Connected || challengeInput.Remote) challengeInput = ActiveDevices().First(d => !d.Remote);
-        challengeZombie = Zombie.Spawn(0, challengeInput, Level.SpawnPoint(0));
+        challengeZombie = Zombie.Spawn(0, SkinOf(challengeInput), challengeInput, Level.SpawnPoint(0));
         RunActive = true;
         SetPhase(Phase.Challenge);
         Sfx.Play("go");
@@ -396,7 +396,7 @@ public partial class GameManager
             {
                 respawnTimer = -1f;
                 Zombie.ClearAll();
-                challengeZombie = Zombie.Spawn(0, challengeInput, Level.SpawnPoint(0));
+                challengeZombie = Zombie.Spawn(0, SkinOf(challengeInput), challengeInput, Level.SpawnPoint(0));
             }
         }
         else if (challengeZombie.State == ZombieState.Finished) FinishChallenge();
@@ -522,7 +522,7 @@ public partial class GameManager
                 if (editMap.At(x, y) != '1') continue;
                 // zumbi fantasma na largada (sprite de 18x20 px, 16 px por célula, pés no chão da célula)
                 var r = new Rect(a.x + (x + 0.5f - 7.5f / 16f) * cw, a.y - (y + 19f / 16f) * chh, cw * 18f / 16f, chh * 20f / 16f);
-                DrawSprite(r, Art.ZombieFrames(0)[0], new Color(1f, 1f, 1f, 0.75f));
+                DrawSprite(r, Art.ZombieFrames(0, 0)[0], new Color(1f, 1f, 1f, 0.75f));
                 WorldText(Level.CellCenter(new Vector2Int(x, y)) + Vector2.up * 1.3f, "LARGADA", 16, new Color(0.6f, 1f, 0.5f));
             }
 

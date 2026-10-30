@@ -29,7 +29,8 @@ public static class Art
     /// <summary>Cor do jogador i (P1 = 0).</summary>
     public static Color PlayerColor(int i) => PlayerColors[Mathf.Abs(i) % PlayerColors.Length];
 
-    static readonly Color32[] SkinColors =
+    /// <summary>Cor da pele de cada jogador (os visuais que mostram a pele usam esta).</summary>
+    static readonly Color32[] FleshColors =
     {
         new Color32(125, 185, 95, 255),
         new Color32(150, 178, 140, 255),
@@ -201,8 +202,8 @@ public static class Art
             case "platform": return MovingPlatform;
             case "seesaw": return SeesawPlank;
             case "seesawbase": return SeesawBase;
-            case "zombie": return ZombieFrames(I(1))[Mathf.Clamp(I(2), 0, 7)];
-            case "dance": return DanceFrame(I(1), I(2), I(3));
+            case "zombie": return ZombieFrames(I(1), I(2))[Mathf.Clamp(I(3), 0, 7)];
+            case "dance": return DanceFrame(I(1), I(2), I(3), I(4));
             case "ground": return Ground(B(1), I(2));
             case "stone": return Stone(B(1));
             case "spring": return Spring(B(1));
@@ -247,26 +248,6 @@ public static class Art
 
     // ------------------------------------------------------------------ zumbis
 
-    static readonly string[] ZombieUpper =
-    {
-        "..................",
-        "..................",
-        ".....HHHHHH.......",
-        "....HHHHHHHH......",
-        "....HGGHGGGHG.....",
-        "....GGGGWWGWW.....",
-        "....gGGGWRGWR.....",
-        "....gGGGGGGGGG....",
-        "....gGGGMMMMG.....",
-        "....ggGGMTMTG.....",
-        ".....gGGGGGG......",
-        "....SSSSSSSssGGG..",
-        "....SSSSSSSssGGGG.",
-        "....sSSSBSS.......",
-        "....sSSSSSS.......",
-        "....sSSSSSs.......",
-    };
-
     static readonly string[][] ZombieLegs =
     {
         new[] { ".....PPPPP........", ".....PP.PP........", ".....FF.FFF.......", ".................." }, // 0 parado
@@ -281,26 +262,197 @@ public static class Art
         new[] { "...PPPPPPPPP......", "..PP.......PP.....", "..FF.......FF.....", ".................." }, // 9 cavalinho
     };
 
-    /// <summary>Corpo do zumbi sem os braços (nas danças os braços são desenhados à parte).</summary>
-    static readonly string[] ZombieBody =
+    /// <summary>
+    /// Visual do zumbi (cada jogador escolhe o seu no lobby). Todos usam as mesmas pernas e as mesmas poses, e a
+    /// cor do jogador (S, s, L) fica sempre na roupa para dar para saber quem é quem.
+    /// </summary>
+    struct ZombieSkin
     {
-        "..................",
-        "..................",
-        ".....HHHHHH.......",
-        "....HHHHHHHH......",
-        "....HGGHGGGHG.....",
-        "....GGGGWWGWW.....",
-        "....gGGGWRGWR.....",
-        "....gGGGGGGGGG....",
-        "....gGGGMMMMG.....",
-        "....ggGGMTMTG.....",
-        ".....gGGGGGG......",
-        "....SSSSSSSss.....",
-        "....SSSSSSSss.....",
-        "....sSSSBSS.......",
-        "....sSSSSSS.......",
-        "....sSSSSSs.......",
+        public string Name;
+        public char Sleeve, Hand;                // manga e mão do braço (nas danças o de trás fica mais escuro)
+        public (char ch, Color32 c)[] Colors;    // cores só deste visual, por cima das comuns (veja ZombiePalette)
+        public string[] Body;                    // cabeça e tronco sem o braço da frente (16 linhas)
+    }
+
+    static ZombieSkin Skin(string name, char sleeve, char hand, (char, Color32)[] colors, params string[] body) =>
+        new ZombieSkin { Name = name, Sleeve = sleeve, Hand = hand, Colors = colors, Body = body };
+
+    static readonly ZombieSkin[] Skins =
+    {
+        Skin("Clássico", 'S', 'G', null,
+            "..................",
+            "..................",
+            ".....HHHHHH.......",
+            "....HHHHHHHH......",
+            "....HGGHGGGHG.....",
+            "....GGGGWWGWW.....",
+            "....gGGGWRGWR.....",
+            "....gGGGGGGGGG....",
+            "....gGGGMMMMG.....",
+            "....ggGGMTMTG.....",
+            ".....gGGGGGG......",
+            "....SSSSSSSss.....",
+            "....SSSSSSSss.....",
+            "....sSSSBSS.......",
+            "....sSSSSSS.......",
+            "....sSSSSSs......."),
+        Skin("Esqueleto", 'N', 'N', new[] { ('P', C(232, 226, 204)), ('p', C(186, 178, 156)), ('F', C(186, 178, 156)), ('f', C(140, 134, 116)) },
+            "..................",
+            "..................",
+            ".....NNNNNN.......",
+            "....NNNNNNNN......",
+            "....NNNNNNNNN.....",
+            "....nNNNKKNKK.....",
+            "....nNNNKLNKL.....",
+            "....nNNNNNKNNN....",
+            "....nnNNNNNNN.....",
+            ".....nNKNKNKN.....",
+            "......nNNNNN......",
+            "....SSSSSSSnn.....",
+            "....sNNNNNNnn.....",
+            "....sKKNKKK.......",
+            "....sNNNNNN.......",
+            "....sKKNKKs......."),
+        Skin("Faraó", 'X', 'X', new[] { ('P', C(238, 236, 242)), ('p', C(182, 180, 198)), ('F', C(182, 180, 198)), ('f', C(140, 138, 156)) },
+            "..................",
+            "......YYYYY.......",
+            ".....YSSSSSY......",
+            "....YYYYYYYYY.....",
+            "...SSSSSSSSSSY....",
+            "...YYYXXxXXXX.....",
+            "...SSSxXXWRXx.....",
+            "...YYYXXxxXXXX....",
+            "...SSSxXXXXxX.....",
+            "...YYYXXxXKKX.....",
+            "...SSS.xXXXX......",
+            "...YYYYYYYYxx.....",
+            "....SyYSYSYxx.....",
+            "....xXXxXXX.......",
+            "....XxXXXxX.......",
+            "....xXXXxXx......."),
+        Skin("Pirata", 'X', 'G', new[] { ('P', C(92, 64, 44)), ('p', C(66, 46, 32)), ('F', C(36, 32, 44)), ('f', C(24, 20, 30)) },
+            "...Y.........Y....",
+            "...KY..YYY..YK....",
+            "...KKYYKKKYYKK....",
+            "...KKKKKNKKKKK....",
+            "....KKKKKKKKK.....",
+            "....GKKKGGKKK.....",
+            "....gGGGWRKKK.....",
+            "....gGGGGGGGGG....",
+            "....gGGGMMMMG.....",
+            "....ggGGMTMTG.....",
+            ".....gGGGGGG......",
+            "....SSSSSSSxx.....",
+            "....XXXXXXXxx.....",
+            "....sSSSSSS.......",
+            "....KKKKYKK.......",
+            "....XXXXXXx......."),
+        Skin("Astronauta", 'X', 'x', new[] { ('Q', C(96, 150, 205)), ('q', C(70, 112, 168)), ('P', C(238, 236, 242)), ('p', C(182, 180, 198)), ('F', C(110, 106, 124)), ('f', C(70, 64, 82)) },
+            "......xXXXx.......",
+            "....xXXXXXXXx.....",
+            "...xXQQQQQQQXx....",
+            "...XQqGGGGGGQX....",
+            "..xXQGGGWWGWWQX...",
+            "..xXQGGGWRGWRQX...",
+            "..xXQGGGGGGGGQX...",
+            "..xXQGGGMMMMXQX...",
+            "...XQqGGGGGXQX....",
+            "...xXQQQQQQQXx....",
+            "....xXXXXXXXx.....",
+            "..kkXXXXXXXXX.....",
+            "..kkXSSSLSXXX.....",
+            "..kkXSLSSSX.......",
+            "..kkxXXXXXX.......",
+            "....xSSSSSx......."),
+        Skin("Vampiro", 'K', 'V', new[] { ('V', C(198, 204, 196)), ('v', C(150, 158, 150)), ('P', C(36, 32, 44)), ('p', C(24, 20, 30)), ('F', C(24, 20, 30)), ('f', C(14, 12, 20)) },
+            "..................",
+            "..................",
+            ".....KKKKKK.......",
+            "....KKKKKKKK......",
+            "...sKKVKKKVKV.....",
+            "..SsKVVVWWVWW.....",
+            "..SsvVVVWRVWR.....",
+            "..SsvVVVVVVVVV....",
+            "..SsvVVVMMMMV.....",
+            "..SsvvVVTMMTV.....",
+            "..Ss.vVVVVVV......",
+            "..SsKKKXXKKKK.....",
+            "..SsKKKXRKKKK.....",
+            "..SSsKKXYKK.......",
+            "..SSsKKKKKK.......",
+            "..SSSsKKKKK......."),
+        Skin("Palhaço", 'S', 'X', new[] { ('P', C(232, 190, 70)), ('p', C(178, 134, 44)), ('F', C(205, 30, 30)), ('f', C(140, 20, 24)) },
+            "........X.........",
+            ".......YYy........",
+            "......YRYRy.......",
+            ".....XXXXXX.......",
+            "..SSSXXXXXXX......",
+            ".SSSSXXXWWXWW.....",
+            ".SSSSXXXWRXWR.....",
+            ".SSSSXXXXXXXRR....",
+            "..SSxXXRXXXRRR....",
+            "....xxXXRRRRX.....",
+            ".....xXXXXXX......",
+            "...XxXxXxXxSS.....",
+            "....SXSSSXSss.....",
+            "....sSSYSSS.......",
+            "....sSXSSXS.......",
+            "....sSSYSSs......."),
+        Skin("Craque", 'S', 'G', new[] { ('P', C(238, 236, 242)), ('p', C(182, 180, 198)), ('F', C(36, 32, 44)), ('f', C(24, 20, 30)) },
+            "..................",
+            "..................",
+            ".....HHHHHH.......",
+            "....HHHHHHHH......",
+            "....XXXXXXXXX.....",
+            "....GGGGWWGWW.....",
+            "....gGGGWRGWR.....",
+            "....gGGGGGGGGG....",
+            "....gGGGMMMMG.....",
+            "....ggGGMTMTG.....",
+            ".....gGGGGGG......",
+            "....SKSKXXSSS.....",
+            "....SKSKSKSss.....",
+            "....sKSKSKS.......",
+            "....sKSKSKS.......",
+            "....sKSKSKs......."),
+        Skin("Cavalo", 'S', 'G', new[] { ('C', C(150, 100, 62)), ('c', C(110, 72, 44)), ('D', C(82, 52, 34)) },
+            ".....c..c.........",
+            ".....Cc.Cc........",
+            "....sCCCCCC.......",
+            "...ssCCCCCCC......",
+            "...ssCCCWWCCC.....",
+            "...ssCCCWRCCCC....",
+            "...ssCCCCCCCCCC...",
+            "...ssCCCCCCCCCCc..",
+            "...sscCCCCCCCDCc..",
+            "....sccCCCcMMMc...",
+            "....sccCCCcTTc....",
+            "....SSSSSSSss.....",
+            "....SSSSSSSss.....",
+            "....sSSSBSS.......",
+            "....sSSSSSS.......",
+            "....sSSSSSs......."),
+        Skin("Punk", 'K', 'G', new[] { ('P', C(64, 78, 120)), ('p', C(46, 56, 90)), ('F', C(36, 32, 44)), ('f', C(24, 20, 30)) },
+            "......S.S.S.......",
+            ".....SSLSLSS......",
+            ".....GSSSSSSG.....",
+            "....GGGGGGGGG.....",
+            "....GGGGGGGGG.....",
+            "....GGGGWWGWW.....",
+            "....gGGGWRGWR.....",
+            "....YGGGGGGGGG....",
+            "....gGGGMMMMG.....",
+            "....ggGGMTMTG.....",
+            ".....gGGGGGG......",
+            "....KKKSSSKkk.....",
+            "....KxKSSSKkk.....",
+            "....KKKSBSK.......",
+            "....KxKSSSK.......",
+            "....KKKSSSK......."),
     };
+
+    public static int SkinCount => Skins.Length;
+    public static string SkinName(int skin) => Skins[Mathf.Abs(skin) % Skins.Length].Name;
 
     /// <summary>Pose de dança: pernas, tronco abaixado/deslocado e braços (cotovelo e mão em pixels do quadro).</summary>
     struct DancePose
@@ -938,80 +1090,103 @@ public static class Art
     }
 
     /// <summary>Quadro da dança no tempo t (segundos desde que começou).</summary>
-    public static Sprite DanceSprite(int variant, int dance, float t)
+    public static Sprite DanceSprite(int variant, int skin, int dance, float t)
     {
         var d = Dances[Mathf.Abs(dance) % Dances.Length];
-        return DanceFrame(variant, dance, (int)(t * d.fps) % d.poses.Length);
+        return DanceFrame(variant, skin, dance, (int)(t * d.fps) % d.poses.Length);
     }
 
-    static Sprite DanceFrame(int variant, int dance, int frame)
+    static Sprite DanceFrame(int variant, int skin, int dance, int frame)
     {
         variant = Mathf.Abs(variant) % PlayerColors.Length;
+        skin = Mathf.Abs(skin) % Skins.Length;
         dance = Mathf.Abs(dance) % Dances.Length;
         var pose = Dances[dance].poses[Mathf.Clamp(frame, 0, Dances[dance].poses.Length - 1)];
-        return Cached($"dance_{variant}_{dance}_{frame}", () => BuildZombie(variant, pose.Legs, pose.Bob, pose));
+        return Cached($"dance_{variant}_{skin}_{dance}_{frame}", () => BuildZombie(variant, skin, pose.Legs, pose.Bob, pose));
     }
 
     /// <summary>Quadros do zumbi: 0-1 parado, 2-5 andando, 6 pulando, 7 caindo.</summary>
-    public static Sprite[] ZombieFrames(int variant)
+    public static Sprite[] ZombieFrames(int variant, int skin)
     {
         variant = Mathf.Abs(variant) % PlayerColors.Length;
+        skin = Mathf.Abs(skin) % Skins.Length;
         // (pernas, deslocamento do tronco para baixo)
         var spec = new (int legs, int bob)[] { (0, 0), (0, 1), (1, 0), (2, 1), (3, 0), (2, 1), (4, 0), (1, 0) };
         var frames = new Sprite[spec.Length];
         for (int i = 0; i < spec.Length; i++)
         {
             int idx = i;
-            frames[i] = Cached($"zombie_{variant}_{i}", () => BuildZombie(variant, spec[idx].legs, spec[idx].bob));
+            frames[i] = Cached($"zombie_{variant}_{skin}_{i}", () => BuildZombie(variant, skin, spec[idx].legs, spec[idx].bob));
         }
         return frames;
     }
 
-    static Sprite BuildZombie(int variant, int legs, int bob, DancePose? dance = null)
+    /// <summary>
+    /// Cores dos mapas do zumbi. Comuns: H cabelo, G/g pele, W/R olho, M/T boca, B sangue, S/s/L cor do jogador
+    /// (normal, escura, clara), K/k preto, X/x branco, Y/y dourado, N/n osso, P/p calça e F/f sapato.
+    /// </summary>
+    static Color32? ZombiePalette(ZombieSkin look, int variant, char ch)
     {
-        Color32 skin = SkinColors[variant], skinD = Shade(skin, 0.75f);
-        Color32 shirt = PlayerColors[variant], shirtD = Shade(shirt, 0.7f);
-        Color32 hair = HairColors[variant];
-        Color32 pants = C(62, 58, 92), pantsD = C(44, 40, 66);
-        Color32 shoe = C(58, 44, 38), shoeD = C(38, 30, 26);
-
-        Color32? Pal(char ch)
+        if (look.Colors != null)
+            foreach (var (k, c) in look.Colors)
+                if (k == ch) return c;
+        Color32 shirt = PlayerColors[variant];
+        switch (ch)
         {
-            switch (ch)
-            {
-                case 'H': return hair;
-                case 'G': return skin;
-                case 'g': return skinD;
-                case 'W': return C(240, 236, 175);
-                case 'R': return C(205, 30, 30);
-                case 'M': return C(75, 14, 22);
-                case 'T': return C(232, 226, 200);
-                case 'S': return shirt;
-                case 's': return shirtD;
-                case 'B': return C(130, 22, 26);
-                case 'P': return pants;
-                case 'p': return pantsD;
-                case 'F': return shoe;
-                case 'f': return shoeD;
-                default: return null;
-            }
+            case 'H': return HairColors[variant];
+            case 'G': return FleshColors[variant];
+            case 'g': return Shade(FleshColors[variant], 0.75f);
+            case 'W': return C(240, 236, 175);
+            case 'R': return C(205, 30, 30);
+            case 'M': return C(75, 14, 22);
+            case 'T': return C(232, 226, 200);
+            case 'B': return C(130, 22, 26);
+            case 'S': return shirt;
+            case 's': return Shade(shirt, 0.7f);
+            case 'L': return Color32.Lerp(shirt, C(255, 255, 255), 0.45f);
+            case 'K': return C(36, 32, 44);
+            case 'k': return C(70, 64, 82);
+            case 'X': return C(238, 236, 242);
+            case 'x': return C(182, 180, 198);
+            case 'Y': return C(232, 190, 70);
+            case 'y': return C(178, 134, 44);
+            case 'N': return C(232, 226, 204);
+            case 'n': return C(186, 178, 156);
+            case 'P': return C(62, 58, 92);
+            case 'p': return C(44, 40, 66);
+            case 'F': return C(58, 44, 38);
+            case 'f': return C(38, 30, 26);
+            default: return null;
         }
+    }
+
+    static Sprite BuildZombie(int variant, int skin, int legs, int bob, DancePose? dance = null)
+    {
+        var look = Skins[skin];
+        Color32? Pal(char ch) => ZombiePalette(look, variant, ch);
+        Color32 sleeve = Pal(look.Sleeve) ?? Outline, hand = Pal(look.Hand) ?? Outline;
 
         var c = new Canvas(18, 20);
         c.Map(ZombieLegs[legs], Pal, 0, 16);
         if (dance is DancePose d)
         {
             // braço de trás atrás do corpo, o da frente por cima; manga até o cotovelo e pele até a mão
-            void Arm(int sx, (int ex, int ey, int hx, int hy) a, Color32 sleeve, Color32 hand)
+            void Arm(int sx, (int ex, int ey, int hx, int hy) a, Color32 sl, Color32 hd)
             {
-                c.Line(sx + d.Dx, 11 + bob, a.ex + d.Dx, a.ey + bob, sleeve);
-                c.Line(a.ex + d.Dx, a.ey + bob, a.hx + d.Dx, a.hy + bob, hand);
+                c.Line(sx + d.Dx, 11 + bob, a.ex + d.Dx, a.ey + bob, sl);
+                c.Line(a.ex + d.Dx, a.ey + bob, a.hx + d.Dx, a.hy + bob, hd);
             }
-            Arm(3, d.Back, shirtD, skinD);
-            c.Map(ZombieBody, Pal, d.Dx, bob);
-            Arm(11, d.Front, shirt, skin);
+            Arm(3, d.Back, Shade(sleeve, 0.7f), Shade(hand, 0.75f));
+            c.Map(look.Body, Pal, d.Dx, bob);
+            Arm(11, d.Front, sleeve, hand);
         }
-        else c.Map(ZombieUpper, Pal, 0, bob);
+        else
+        {
+            // braço esticado para a frente (a manga já está no tronco)
+            c.Map(look.Body, Pal, 0, bob);
+            c.Rect(13, 11 + bob, 3, 1, hand);
+            c.Rect(13, 12 + bob, 4, 1, hand);
+        }
         c.AddOutline(Outline);
         bool flip = dance.HasValue && dance.Value.Flip;
         if (flip) c.MirrorX();

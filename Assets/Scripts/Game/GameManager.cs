@@ -20,6 +20,7 @@ public class PlayerSlot
     public bool IsBot => Bot != null;
     public int Kills;
     public int Dance = -1, LastDance = -1;   // dança no lobby/placar (-1 = parado)
+    public int Skin;                         // visual do zumbi (Art.SkinName), escolhido no lobby
     public bool Dancing => Dance >= 0;
     public readonly List<KeyValuePair<string, int>> RoundPoints = new List<KeyValuePair<string, int>>();
 
@@ -237,7 +238,7 @@ public partial class GameManager : MonoBehaviour
         if (Players.Count >= MaxPlayers) return null;
         int index = 0;
         while (Players.Any(p => p.Index == index)) index++;
-        var slot = new PlayerSlot { Index = index, Input = input, JoinFrame = Time.frameCount };
+        var slot = new PlayerSlot { Index = index, Input = input, JoinFrame = Time.frameCount, Skin = input.Remote ? 0 : SavedSkin(index) };
         Players.Add(slot);
         Players.Sort((a, b) => a.Index.CompareTo(b.Index));
         Sfx.Play("join");
@@ -252,8 +253,28 @@ public partial class GameManager : MonoBehaviour
         if (slot == null) return null;
         slot.Bot = new BotPlayer(difficulty);
         slot.Ready = true;
+        slot.Skin = Random.Range(0, Art.SkinCount);
         return slot;
     }
+
+    static string SkinPrefKey(int index) => "visual_zumbi_" + index;
+
+    /// <summary>Visual que o jogador deste lugar escolheu da última vez (fica salvo no computador).</summary>
+    static int SavedSkin(int index) => Mathf.Clamp(PlayerPrefs.GetInt(SkinPrefKey(index), 0), 0, Art.SkinCount - 1);
+
+    void NextSkin(PlayerSlot p)
+    {
+        p.Skin = (p.Skin + 1) % Art.SkinCount;
+        if (!p.Input.Remote)
+        {
+            PlayerPrefs.SetInt(SkinPrefKey(p.Index), p.Skin);
+            PlayerPrefs.Save();
+        }
+        Sfx.Play("tick");
+    }
+
+    /// <summary>Visual de quem joga com este dispositivo (quem não entrou no lobby usa o do P1).</summary>
+    int SkinOf(InputSource d) => Players.FirstOrDefault(p => p.Input.SameDevice(d))?.Skin ?? SavedSkin(0);
 
     PlayerSlot LastBot => Players.Where(p => p.IsBot).OrderBy(p => p.JoinFrame).LastOrDefault();
 
@@ -299,6 +320,7 @@ public partial class GameManager : MonoBehaviour
         {
             if (!p.Input.Connected) { Players.Remove(p); continue; }
             if (p.JoinFrame == Time.frameCount || !Listening(p.Input)) continue;
+            if (p.Input.SkinDown) NextSkin(p);
             if (p.Input.ConfirmDown && !p.Ready)
             {
                 p.Ready = true;
@@ -668,7 +690,7 @@ public partial class GameManager : MonoBehaviour
         finishOrder.Clear();
         timeUp = botsOnly = false;
         runTimer = RunTime;
-        foreach (var p in Players) p.Zombie = Zombie.Spawn(p.Index, p.Input, Level.SpawnPoint(p.Index));
+        foreach (var p in Players) p.Zombie = Zombie.Spawn(p.Index, p.Skin, p.Input, Level.SpawnPoint(p.Index));
         RunActive = true;
         RunBehaviour.RunStarted();
         Sfx.Play("go");
@@ -901,6 +923,7 @@ public partial class GameManager : MonoBehaviour
 
     static string ConfirmKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[ESPAÇO]" : i.Kind == DeviceKind.Keyboard2 ? "[ENTER]" : "{A}";
     static string BackKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q]" : i.Kind == DeviceKind.Keyboard2 ? "[BACKSPACE]" : "{B}";
+    static string SkinKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[R]" : i.Kind == DeviceKind.Keyboard2 ? "[CTRL]" : "{LB}";
     static string RotateKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q] [E]" : i.Kind == DeviceKind.Keyboard2 ? "[CTRL] [SHIFT]" : "{LB} {RB}";
     const string AnyConfirm = "[ESPAÇO] [ENTER] {A}";
     const string AnyDance = "[F] [.] {X}";
@@ -1106,7 +1129,7 @@ public partial class GameManager : MonoBehaviour
             {
                 Fill(R(x, y0, cw, 6), new Color(0.3f, 0.3f, 0.35f));
                 Text(R(tx, y0 + 10, tw, 34), $"JOGADOR {i + 1}", 24, new Color(0.5f, 0.5f, 0.55f), TextAnchor.MiddleLeft);
-                DrawSprite(sprite, Art.ZombieFrames(i)[0], new Color(0f, 0f, 0f, 0.5f));
+                DrawSprite(sprite, Art.ZombieFrames(i, 0)[0], new Color(0f, 0f, 0f, 0.5f));
                 Text(R(tx, y0 + 46, tw, 26), "Para entrar:", 16, new Color(0.8f, 0.8f, 0.85f), TextAnchor.MiddleLeft);
                 Keys(R(tx, y0 + 74, tw, 28), InputSource.GamepadsSupported ? "[ESPAÇO] [ENTER] {A}" : "[ESPAÇO] [ENTER]", 16, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleLeft);
                 Text(R(tx, y0 + 104, tw, 22), InputSource.GamepadsSupported ? "WASD, setas ou controle" : "WASD ou setas", 13, dim, TextAnchor.MiddleLeft);
@@ -1116,7 +1139,8 @@ public partial class GameManager : MonoBehaviour
 
             Fill(R(x, y0, cw, 6), pc);
             Text(R(tx, y0 + 10, tw, 34), $"JOGADOR {i + 1}", 24, pc, TextAnchor.MiddleLeft);
-            var frames = Art.ZombieFrames(i);
+            var frames = Art.ZombieFrames(i, slot.Skin);
+            Text(R(x + 4, y0 + 136, 110, 24), Art.SkinName(slot.Skin).ToUpper(), 15, new Color(0.85f, 0.82f, 0.92f));
 
             if (slot.IsBot)
             {
@@ -1131,7 +1155,7 @@ public partial class GameManager : MonoBehaviour
                 continue;
             }
 
-            if (slot.Dancing) DrawSprite(sprite, Art.DanceSprite(i, slot.Dance, Time.time), Color.white);
+            if (slot.Dancing) DrawSprite(sprite, Art.DanceSprite(i, slot.Skin, slot.Dance, Time.time), Color.white);
             else
             {
                 int f = slot.Ready ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
@@ -1140,16 +1164,14 @@ public partial class GameManager : MonoBehaviour
             }
             Text(R(tx, y0 + 46, tw, 26), DeviceLabel(slot), 17, new Color(0.85f, 0.85f, 0.9f), TextAnchor.MiddleLeft);
             if (slot.Ready)
-            {
-                Text(R(tx, y0 + 74, tw, 40), "PRONTO!", 32, new Color(0.5f, 1f, 0.45f), TextAnchor.MiddleLeft);
-                Keys(R(tx, y0 + 126, tw, 26), $"{BackKey(slot.Input)} cancelar", 14, dim, TextAnchor.MiddleLeft);
-            }
+                Text(R(tx, y0 + 66, tw, 40), "PRONTO!", 32, new Color(0.5f, 1f, 0.45f), TextAnchor.MiddleLeft);
             else
             {
                 float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 6f);
-                Keys(R(tx, y0 + 78, tw, 34), $"{ConfirmKey(slot.Input)} ficar pronto", 18, new Color(1f, 0.9f, 0.5f, blink), TextAnchor.MiddleLeft);
-                Keys(R(tx, y0 + 126, tw, 26), $"{BackKey(slot.Input)} sair", 14, dim, TextAnchor.MiddleLeft);
+                Keys(R(tx, y0 + 72, tw, 34), $"{ConfirmKey(slot.Input)} ficar pronto", 18, new Color(1f, 0.9f, 0.5f, blink), TextAnchor.MiddleLeft);
             }
+            Keys(R(tx, y0 + 104, tw, 24), $"{SkinKey(slot.Input)} trocar zumbi", 14, hint, TextAnchor.MiddleLeft);
+            Keys(R(tx, y0 + 128, tw, 26), $"{BackKey(slot.Input)} {(slot.Ready ? "cancelar" : "sair")}", 14, dim, TextAnchor.MiddleLeft);
         }
 
         string status;
@@ -1409,11 +1431,11 @@ public partial class GameManager : MonoBehaviour
         {
             var p = Players[i];
             float y = y0 + i * rowH;
-            var frames = Art.ZombieFrames(p.Index);
+            var frames = Art.ZombieFrames(p.Index, p.Skin);
             bool scored = p.Score > p.PrevScore;
             int fr = scored ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
             var zr = R(barX - 130 - 90 * k, y - 10 * k, 90 * k, 100 * k);
-            if (p.Dancing) DrawSprite(zr, Art.DanceSprite(p.Index, p.Dance, Time.time), Color.white);
+            if (p.Dancing) DrawSprite(zr, Art.DanceSprite(p.Index, p.Skin, p.Dance, Time.time), Color.white);
             else DrawSprite(zr, frames[fr], Color.white);
             Text(R(barX - 120, y, 110, 80 * k), p.Name, Sz(40, 22), p.Color, TextAnchor.MiddleLeft);
             if (p.IsBot) Text(R(barX - 120, y + 52 * k, 110, 30 * k), "CPU " + p.Bot.Label, Sz(16, 12), p.Bot.LabelColor, TextAnchor.MiddleLeft);
@@ -1457,7 +1479,7 @@ public partial class GameManager : MonoBehaviour
         Text(R(0, 90 + wob, VW, 140), $"{w.FullName} VENCEU!", w.IsBot ? 96 : 120, w.Color);
         Text(R(0, 230, VW, 50), "O zumbi mais esperto do cemitério!", 32, new Color(0.9f, 0.85f, 1f));
 
-        var frames = Art.ZombieFrames(w.Index);
+        var frames = Art.ZombieFrames(w.Index, w.Skin);
         int f = 2 + (int)(Time.time * 9f) % 4;
         float hop = Mathf.Abs(Mathf.Sin(Time.time * 6f)) * 40f;
         DrawSprite(R(VW / 2 - 135, 330 - hop, 270, 300), frames[f], Color.white, (int)(Time.time * 1.5f) % 2 == 0);
