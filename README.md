@@ -11,6 +11,30 @@ Cada rodada tem três fases:
 
 Os itens ficam na fase de uma rodada para a outra, então ela vai ficando cada vez mais difícil.
 
+## Menu principal, pausa e configurações
+
+O jogo abre no **menu principal**: **Jogar** (lobby), **Jogar online**, **Criar fase**, **Configurações**,
+**Controles** e **Sair** (o Sair não aparece no navegador). Qualquer teclado ou controle mexe no menu
+(cima/baixo escolhe, CONFIRMAR aperta, VOLTAR volta) e o mouse também. No lobby, **Esc**/**Start** volta para o menu
+(no online, para sair da sala use o painel online).
+
+Na partida, **Esc**/**Start** abre o **menu de pausa**: **Continuar**, **Configurações**, **Controles** e
+**Sair da partida** (volta para o lobby; no desafio solo, **Sair do desafio** volta para o criador de fases).
+VOLTAR ou Esc/Start de novo continuam o jogo. No online quem mexe na pausa é o host (os outros veem o mesmo menu)
+e as configurações ficam só no menu principal, porque cada computador tem as suas.
+
+| Configuração | O que muda |
+|---|---|
+| Volume | De 0 (mudo) a 100%, de 10 em 10 |
+| Tela cheia | Tela cheia ou janela de 1280 x 720 (no navegador, use o botão de tela cheia da página) |
+| Resolução | As resoluções do monitor (na janela, o tamanho dela) |
+| Pontos para vencer | De 3 a 30 (padrão 10) |
+| Tremer a tela | Liga/desliga o tremor quando alguém morre ou algo explode |
+
+Esquerda/direita mudam o valor (CONFIRMAR ou clicar passa para o próximo). Tudo fica salvo no computador
+(`PlayerPrefs`; a tela cheia e a resolução o próprio Unity guarda). A tela **Controles** mostra a tabela com as
+teclas de cada tipo de dispositivo e os atalhos do lobby.
+
 ## Bots (jogadores do computador)
 
 No lobby, qualquer jogador controla os bots:
@@ -61,7 +85,8 @@ Não dá para colocar itens no trilho do trem (área marcada durante o posiciona
 
 ## Criador de fases e desafios
 
-No lobby, aperte **C** (teclado), **Select** (controle) ou clique em **CRIAR FASE** (só no jogo offline).
+Escolha **Criar fase** no menu principal ou, no lobby, aperte **C** (teclado), **Select** (controle) ou clique em
+**CRIAR FASE** (só no jogo offline).
 Dá para montar a fase com qualquer teclado, controle ou mouse:
 
 | Ação | Teclado | Controle | Mouse |
@@ -119,14 +144,15 @@ A partida começa quando pelo menos 2 jogadores estão prontos. Funciona com qua
 | Dançar (de novo: sorteia outra dança) | F | . (do teclado numérico ou ao lado da vírgula) | X |
 | Trocar o visual do zumbi (no lobby) | R | Ctrl direito | LB |
 
-Com o jogo pausado: CONFIRMAR continua e VOLTAR sai para o lobby.
+Com o jogo pausado abre o menu de pausa (veja [Menu principal, pausa e configurações](#menu-principal-pausa-e-configurações)).
 O zumbi também desliza e pula na parede.
 Dá para dançar no lobby, no placar e na corrida (parado no chão). O zumbi dança sem parar até andar, pular ou morrer,
 e cada aperto sorteia outra dança das raças do World of Warcraft (26 no total: a masculina e a feminina de cada raça).
 Os bots às vezes comemoram dançando no placar quando chegam no cérebro.
 
-O lobby e a tela de pausa mostram uma tabela com os controles de cada tipo de dispositivo (a coluna de quem
-está jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
+No lobby, o cartão de cada jogador mostra os botões dele (ficar pronto, trocar o visual, sair). A tabela com os
+controles de cada tipo de dispositivo fica em **Controles**, no menu principal e na pausa (a coluna de quem está
+jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
 mostra os botões daquele jogador, e nas duas primeiras corridas aparece um lembrete de como pular.
 
 ## Visuais dos zumbis
@@ -153,7 +179,7 @@ No online, cada jogador troca o seu do mesmo jeito, no lobby do host.
 
 ## Multiplayer online
 
-Aperte **O** no lobby para abrir o painel **JOGAR ONLINE**:
+Escolha **Jogar online** no menu principal (ou aperte **O** no lobby) para abrir o painel **JOGAR ONLINE**:
 
 - **Criar sala**: o jogo gera um **código** (ex.: `K7QF2M`). Passe para os amigos.
 - **Entrar com código**: digite o código e aperte Enter. Funciona pela internet e também na versão do navegador (itch.io).
@@ -228,7 +254,7 @@ Não dá para colocar itens nas áreas de largada e de chegada (aparecem marcada
 ## Como abrir e jogar
 
 1. Abra a pasta `ZumbiHorse` pelo Unity Hub (Unity 6000.3.25f1).
-2. A cena `Assets/Scenes/Jogo.unity` abre sozinha na primeira vez. Aperte **Play**.
+2. A cena `Assets/Scenes/Jogo.unity` abre sozinha na primeira vez. Aperte **Play**: o jogo abre no menu principal.
    (O jogo também roda a partir de qualquer cena vazia: o `Bootstrap` cria o `GameManager`.)
 3. Para gerar executável: menu **Zumbi Horse > Build Linux**, **Build Windows** ou **Build WebGL (itch.io)**.
    Cada um precisa do módulo daquela plataforma instalado no Unity Hub (Installs > engrenagem > Add modules);
@@ -295,6 +321,7 @@ Assets/
     Game/
       GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
       GameManager.Net.cs modo cópia do cliente online, estado da interface pela rede, painel online
+      GameManager.Menu.cs    menu principal, menu de pausa, configurações (salvas) e tela de controles
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
       MapCode.cs         fases criadas: código de compartilhar, espaços salvos e trens automáticos
       GameManager.Editor.cs  criador de fases e desafio solo contra o relógio

@@ -14,7 +14,7 @@ public enum NetMode { Offline, Connecting, Host, Client }
 public class NetGame : MonoBehaviour
 {
     /// <summary>Muda quando as mensagens mudam: host e cliente precisam da mesma versão.</summary>
-    public const int Protocol = 6;
+    public const int Protocol = 7;
     const float SendInterval = 1f / 30f;
     const float PingInterval = 0.5f;
     const float ConnectTimeout = 20f;

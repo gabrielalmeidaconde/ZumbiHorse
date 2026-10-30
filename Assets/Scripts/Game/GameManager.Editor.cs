@@ -20,6 +20,7 @@ public partial class GameManager
     int creatorSel;
     int clickedItem = -1;        // item clicado com o mouse no OnGUI, tratado no Update seguinte
     bool creatorClicked, mouseMoved;
+    bool creatorFromMenu;        // aberto pelo menu principal: sair volta para ele (senão, para o lobby)
     Vector2 lastMouse;
     readonly MapDef[] slotMaps = new MapDef[MapCode.Slots];
     readonly int[] slotTimes = new int[MapCode.Slots];
@@ -59,6 +60,7 @@ public partial class GameManager
 
     void OpenCreator()
     {
+        creatorFromMenu = Phase == Phase.Menu;
         lobbyCountdown = -1f;
         LoadSlots();
         creatorScreen = CreatorScreen.Slots;
@@ -114,11 +116,17 @@ public partial class GameManager
     void UpdateSlots()
     {
         bool confirm = ListInput(MapCode.Slots + 2, out bool back, out _);
-        if (back) { BackToLobby(); Sfx.Play("tick"); return; }
+        if (back) { LeaveCreator(); return; }
         if (!confirm) return;
         if (creatorSel < MapCode.Slots) OpenSlot(creatorSel);
         else if (creatorSel == MapCode.Slots) PasteChallenge();
-        else BackToLobby();
+        else LeaveCreator();
+    }
+
+    void LeaveCreator()
+    {
+        if (creatorFromMenu) BackToMenu();
+        else { BackToLobby(); Sfx.Play("tick"); }
     }
 
     void OpenSlot(int slot)
@@ -502,7 +510,7 @@ public partial class GameManager
         }
         y += 12f;
         DrawListItem(y, 64f, MapCode.Slots, "COLAR CÓDIGO DE DESAFIO", null);
-        DrawListItem(y + 72f, 64f, MapCode.Slots + 1, "VOLTAR AO LOBBY", null);
+        DrawListItem(y + 72f, 64f, MapCode.Slots + 1, creatorFromMenu ? "VOLTAR AO MENU" : "VOLTAR AO LOBBY", null);
         DrawBottomHelp($"{{ANALÓGICO}} [W] [S] [^] [v] escolher   •   {AnyConfirm} abrir   •   [Q] [BACKSPACE] {{B}} voltar   •   ou use o mouse");
     }
 

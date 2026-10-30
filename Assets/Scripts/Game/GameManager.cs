@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge }
+public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge, Menu }
 
 public class PlayerSlot
 {
@@ -38,9 +38,9 @@ public class PlayerSlot
 
 /// <summary>
 /// Controla a partida no estilo Ultimate Chicken Horse:
-/// Lobby → Escolha de item → Posicionamento → Corrida até o cérebro → Placar → ... → Vitória.
+/// Menu → Lobby → Escolha de item → Posicionamento → Corrida até o cérebro → Placar → ... → Vitória.
 /// Toda a interface é desenhada com IMGUI (OnGUI) para o projeto não depender de prefabs.
-/// A parte do multiplayer online fica em GameManager.Net.cs.
+/// O multiplayer online fica em GameManager.Net.cs e os menus (principal, pausa, configurações) em GameManager.Menu.cs.
 /// </summary>
 public partial class GameManager : MonoBehaviour
 {
@@ -113,7 +113,9 @@ public partial class GameManager : MonoBehaviour
         gameObject.AddComponent<BotSystem>();
         gameObject.AddComponent<NetGame>();
         Level.Build(Maps.All[0]);
+        LoadSettings();
         DemoDriver.TryAttach(this);
+        if (!DemoDriver.Active) OpenMainMenu(); // o modo de teste vai direto para o lobby
     }
 
     void OnDestroy()
@@ -151,7 +153,7 @@ public partial class GameManager : MonoBehaviour
             y = -(EditBottomH - EditTopH) / 1080f * size;
         }
         cam.orthographicSize = size;
-        Vector2 off = shake > 0f ? Random.insideUnitCircle * shake : Vector2.zero;
+        Vector2 off = shake > 0f && shakeOn ? Random.insideUnitCircle * shake : Vector2.zero;
         cam.transform.position = new Vector3(off.x, y + off.y, -10f);
         shake = Mathf.MoveTowards(shake, 0f, Time.unscaledDeltaTime * 1.5f);
     }
@@ -177,6 +179,7 @@ public partial class GameManager : MonoBehaviour
             case Phase.Victory: UpdateVictory(); break;
             case Phase.Editor: UpdateCreator(); break;
             case Phase.Challenge: UpdateChallenge(); break;
+            case Phase.Menu: UpdateMenu(); break;
         }
         UpdateDances();
         floats.RemoveAll(f => Time.time - f.Start > f.Duration);
@@ -203,24 +206,13 @@ public partial class GameManager : MonoBehaviour
         doneTimer = -1f;
     }
 
-    /// <summary>Retorna true se o pause mudou neste quadro (para não repassar o mesmo botão).</summary>
+    /// <summary>Retorna true enquanto a pausa usa os botões (o menu de pausa está aberto ou acabou de abrir).</summary>
     bool HandlePause()
     {
-        if (Phase == Phase.Lobby || Phase == Phase.Editor) return false;
-        var devices = ActiveDevices();
-        bool toggle = devices.Any(d => d.PauseDown);
-        if (paused)
-        {
-            if (devices.Any(d => d.BackDown))
-            {
-                if (Phase == Phase.Challenge) { SetPaused(false); ExitChallenge(); }
-                else BackToLobby();
-                return true;
-            }
-            if (devices.Any(d => d.ConfirmDown)) toggle = true;
-        }
-        if (!toggle) return false;
-        SetPaused(!paused);
+        if (Phase == Phase.Lobby || Phase == Phase.Editor || Phase == Phase.Menu) return false;
+        if (paused) { UpdateMenu(); return true; }
+        if (!ActiveDevices().Any(d => d.PauseDown)) return false;
+        SetPaused(true);
         Sfx.Play("tick");
         return true;
     }
@@ -229,6 +221,7 @@ public partial class GameManager : MonoBehaviour
     {
         paused = on;
         Time.timeScale = paused ? 0f : 1f;
+        if (on) OpenMenuScreen(MenuScreen.Pause);
     }
 
     // ================================================================== lobby
@@ -284,6 +277,8 @@ public partial class GameManager : MonoBehaviour
         bool openCreator = creatorClicked || (InputSource.CreatorKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.SelectDown);
         creatorClicked = false;
         if (openCreator && CanCreate) { OpenCreator(); return; }
+        // ESC/START volta para o menu principal (no online, para sair da sala use o painel)
+        if (!Online && devices.Any(d => !d.Remote && d.PauseDown)) { BackToMenu(); return; }
         foreach (var d in devices)
         {
             if (!d.ConfirmDown || Players.Any(p => p.Input.SameDevice(d))) continue;
@@ -344,11 +339,6 @@ public partial class GameManager : MonoBehaviour
             if (Mathf.CeilToInt(lobbyCountdown) != before && lobbyCountdown > 0f) Sfx.Play("tick");
             if (lobbyCountdown <= 0f) StartMatch();
         }
-
-#if !UNITY_EDITOR && !UNITY_WEBGL
-        if (devices.Count > 0 && devices[0].Kind == DeviceKind.Keyboard1 && !devices[0].Remote && devices[0].PauseDown &&
-            NetGame.Instance.Mode == NetMode.Offline) Application.Quit();
-#endif
     }
 
     /// <summary>Escolhe o mapa (com volta) e mostra ele atrás do lobby.</summary>
@@ -902,6 +892,7 @@ public partial class GameManager : MonoBehaviour
             case Phase.Victory: DrawVictory(); break;
             case Phase.Editor: DrawCreator(); break;
             case Phase.Challenge: DrawChallenge(); break;
+            case Phase.Menu: DrawMainMenu(); break;
         }
 
         foreach (var f in floats)
@@ -912,8 +903,9 @@ public partial class GameManager : MonoBehaviour
             WorldText(f.Pos + Vector2.up * t * 1.2f, f.Text, f.Size, c);
         }
 
-        if (paused) DrawPause();
+        if (paused) DrawPauseMenu();
         DrawOnline();
+        DrawTransition();
     }
 
     // ------------------------------------------------------------------ teclas e botões desenhados
@@ -929,7 +921,7 @@ public partial class GameManager : MonoBehaviour
     const string AnyDance = "[F] [.] {X}";
 
     static readonly string[] DeviceTitles = { "TECLADO  ·  WASD", "TECLADO  ·  SETAS", "CONTROLE" };
-    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar" };
+    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar", "Trocar zumbi" };
     static readonly string[,] ControlKeys =
     {
         { "[W] [A] [S] [D]", "[<] [^] [v] [>]", "{ANALÓGICO} ou {D-PAD}" },
@@ -939,6 +931,7 @@ public partial class GameManager : MonoBehaviour
         { "[Q]", "[BACKSPACE]", "{B}" },
         { "[ESC]", "[ESC]", "{START}" },
         { "[F]", "[.]", "{X}" },
+        { "[R]", "[CTRL] direito", "{LB}" },
     };
 
     static readonly Color CapEdge = new Color(0.04f, 0.03f, 0.07f), CapFace = new Color(0.93f, 0.91f, 0.97f),
@@ -1182,14 +1175,14 @@ public partial class GameManager : MonoBehaviour
         else status = "Esperando todo mundo ficar pronto...";
         Text(R(0, 636, VW, 48), status, 34, sc);
 
-        float th = DrawControls(688f);
-        float y = 688f + th + 4f;
-        float bw = Mathf.Min(VW - 60f, 1560f);
-        Fill(R((VW - bw) / 2f, y - 2f, bw, 90f), new Color(0.05f, 0.03f, 0.09f, 0.8f));
+        // rodapé com os bots, as regras e os atalhos (a tabela com todos os controles fica em CONTROLES, no menu)
+        float y = 966f, bw = Mathf.Min(VW - 60f, 1560f);
+        Fill(R((VW - bw) / 2f, y - 4f, bw, 100f), new Color(0.05f, 0.03f, 0.09f, 0.8f));
         Keys(R(0, y, VW, 32), "BOTS:  [W] [^] ou CIMA adiciona  •  [S] [v] ou BAIXO tira  •  [E] [SHIFT] {RB} muda a dificuldade do último", 17, hint);
         Text(R(0, y + 32, VW, 28), $"Primeiro a fazer {WinScore} pontos vence.  Chegar no cérebro: +{PointsGoal}  •  Primeiro: +{PointsFirst}  •  Matar com sua armadilha: +{PointsTrap}  •  Se todos chegarem, ninguém pontua!", 18, new Color(0.65f, 0.95f, 0.6f));
         string pads = InputSource.GamepadsSupported ? $"Controles conectados: {InputSource.GamepadCount}" : "Input System não ativo: só teclado";
-        Keys(R(0, y + 60, VW, 26), pads + "   •   [ESC] {START} pausar (na partida)   •   [O] jogar online   •   [C] {SELECT} criar fase", 15, new Color(0.6f, 0.6f, 0.66f));
+        string menu = Online ? "" : "   •   [ESC] {START} voltar ao menu";
+        Keys(R(0, y + 62, VW, 28), pads + menu + "   •   [O] jogar online   •   [C] {SELECT} criar fase", 15, new Color(0.6f, 0.6f, 0.66f));
     }
 
     void DrawMapSelector(float y)
@@ -1496,15 +1489,5 @@ public partial class GameManager : MonoBehaviour
             float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 5f);
             Keys(R(0, 960, VW, 50), $"{AnyConfirm}  voltar ao lobby", 28, new Color(1f, 0.9f, 0.5f, blink));
         }
-    }
-
-    void DrawPause()
-    {
-        Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.72f));
-        Text(R(0, 110, VW, 110), "PAUSADO", 84, Color.white);
-        Keys(R(0, 228, VW, 46), $"[ESC] {{START}} ou {AnyConfirm}  continuar", 26, new Color(0.6f, 1f, 0.5f));
-        Keys(R(0, 280, VW, 46), Phase == Phase.Challenge ? "[Q] [BACKSPACE] {B}  sair do desafio" : "[Q] [BACKSPACE] {B}  sair para o lobby", 26, new Color(1f, 0.6f, 0.5f));
-        float h = DrawControls(350f);
-        Text(R(0, 350 + h + 20, VW, 36), "Dicas: segure o pulo para ir mais alto  •  encoste na parede e pule para escalar  •  o primeiro a chegar ganha +1", 21, new Color(0.78f, 0.76f, 0.86f));
     }
 }
