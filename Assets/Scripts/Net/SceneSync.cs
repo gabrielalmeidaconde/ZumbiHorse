@@ -7,7 +7,7 @@ public static class Msg
 {
     // host → cliente
     public const byte Welcome = 1, Reject = 2, SpriteKey = 3, Objects = 4, Remove = 5, Sound = 6, Float = 7, Ui = 8,
-                      Bundle = 9, Pong = 10;
+                      Bundle = 9, Pong = 10, MapData = 11;
     // cliente → host
     public const byte Hello = 20, Input = 21, Ping = 22;
 }

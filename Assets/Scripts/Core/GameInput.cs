@@ -174,8 +174,56 @@ public class InputSource
         }
     }
 
-    /// <summary>Botão Select (View) do controle: abre o criador de fases no lobby.</summary>
+    /// <summary>Botão Select (View) do controle: abre o criador de fases no lobby e testa a fase no editor.</summary>
     public bool SelectDown => !Remote && PadDown(7);
+
+    /// <summary>Criador de fases: -1/+1 para trocar a peça.</summary>
+    public int PieceStep
+    {
+        get
+        {
+            if (Remote) return 0;
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return (Down(K.E) ? 1 : 0) - (Down(K.Q) ? 1 : 0);
+                case DeviceKind.Keyboard2: return (Down(K.RightShift) ? 1 : 0) - (Down(K.RightCtrl) ? 1 : 0);
+                case DeviceKind.Gamepad: return (PadDown(5) ? 1 : 0) - (PadDown(4) ? 1 : 0);
+                default: return 0;
+            }
+        }
+    }
+
+    /// <summary>Criador de fases: girar o item que vai ser colocado.</summary>
+    public bool TurnDown
+    {
+        get
+        {
+            if (Remote) return false;
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.R);
+                case DeviceKind.Keyboard2: return Down(K.Delete);
+                case DeviceKind.Gamepad: return PadDown(3);
+                default: return false;
+            }
+        }
+    }
+
+    /// <summary>Criador de fases: desfazer a última mudança.</summary>
+    public bool UndoDown
+    {
+        get
+        {
+            if (Remote) return false;
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.Z);
+                case DeviceKind.Keyboard2: return Down(K.Backspace);
+                case DeviceKind.Gamepad: return PadDown(1);
+                default: return false;
+            }
+        }
+    }
 
     /// <summary>Girar o item no sentido horário.</summary>
     public bool RotateCWDown
@@ -286,13 +334,15 @@ public class InputSource
 
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C }
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
     public static bool EscapeKeyDown => Down(K.Escape);
     /// <summary>Tecla C: abre o criador de fases no lobby.</summary>
     public static bool CreatorKeyDown => Down(K.C);
+    /// <summary>Tecla T: testa a fase no criador.</summary>
+    public static bool TestKeyDown => Down(K.T);
 
 #if ENABLE_INPUT_SYSTEM
     static UnityEngine.InputSystem.Key Map(K k)
@@ -321,6 +371,10 @@ public class InputSource
             case K.Period: return UnityEngine.InputSystem.Key.Period;
             case K.NumPeriod: return UnityEngine.InputSystem.Key.NumpadPeriod;
             case K.C: return UnityEngine.InputSystem.Key.C;
+            case K.R: return UnityEngine.InputSystem.Key.R;
+            case K.Z: return UnityEngine.InputSystem.Key.Z;
+            case K.T: return UnityEngine.InputSystem.Key.T;
+            case K.Delete: return UnityEngine.InputSystem.Key.Delete;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -383,6 +437,10 @@ public class InputSource
             case K.Period: return KeyCode.Period;
             case K.NumPeriod: return KeyCode.KeypadPeriod;
             case K.C: return KeyCode.C;
+            case K.R: return KeyCode.R;
+            case K.Z: return KeyCode.Z;
+            case K.T: return KeyCode.T;
+            case K.Delete: return KeyCode.Delete;
             default: return KeyCode.Escape;
         }
     }

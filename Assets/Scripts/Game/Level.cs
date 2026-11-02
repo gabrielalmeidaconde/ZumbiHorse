@@ -95,6 +95,27 @@ public static class Level
             TrainZones.Add(TrainZone(t));
         }
         foreach (var s in map.Saws) CreateMovingSaw(s);
+        CreateMapItems(map.Items);
+    }
+
+    /// <summary>Itens que já vêm na fase: ficam como os colocados pelos jogadores, mas sem dono.</summary>
+    static void CreateMapItems(MapItemDef[] items)
+    {
+        Portal pending = null;
+        foreach (var def in items)
+        {
+            var item = ItemFactory.Create(def.Type, def.Type == ItemType.Portal && pending != null ? 1 : 0);
+            item.Rotation = def.Rotation;
+            item.ApplyRotation();
+            item.SnapTo(def.Pivot);
+            if (!item.Place(true)) continue;
+            if (def.Type != ItemType.Portal) continue;
+            var portal = item.GetComponentInChildren<Portal>();
+            if (pending == null) { pending = portal; continue; }
+            pending.Partner = portal;
+            portal.Partner = pending;
+            pending = null;
+        }
     }
 
     /// <summary>Só os dados da fase (nome, largada, chegada, trilhos), sem criar nada: usado pelo cliente online.</summary>
