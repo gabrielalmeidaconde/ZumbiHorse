@@ -244,7 +244,7 @@ public static class Level
         box.isTrigger = true;
         box.size = new Vector2(1f, top ? 0.75f : 1f);
         box.offset = new Vector2(0f, top ? -0.12f : 0f);
-        go.AddComponent<Hazard>();
+        go.AddComponent<Hazard>().Deadly = true;
         Register(go, c, true);
     }
 
@@ -262,7 +262,8 @@ public static class Level
         hz.transform.localPosition = new Vector3(0f, 0.1f, 0f);
         var t = hz.AddComponent<BoxCollider2D>();
         t.isTrigger = true;
-        t.size = new Vector2(0.8f, 0.55f);
+        // pontas um pouco mais largas que a base: quem encosta de lado também se machuca
+        t.size = new Vector2(1.1f, 0.55f);
         hz.AddComponent<Hazard>();
         Register(go, c, true);
     }

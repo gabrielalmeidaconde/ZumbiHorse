@@ -3,6 +3,10 @@ using UnityEngine;
 
 public enum ZombieState { Alive, Dead, Finished }
 
+/// <summary>Partes que o zumbi perde nas armadilhas. Sem a cabeça ele continua, com esquerda e direita trocadas.</summary>
+[System.Flags]
+public enum Limb { BackArm = 1, FrontArm = 2, BackLeg = 4, FrontLeg = 8, Head = 16 }
+
 /// <summary>
 /// Controle de plataforma do zumbi: corrida, pulo variável, coyote time, buffer de pulo,
 /// deslizar e pular na parede, gelo e molas. Zumbis atravessam uns aos outros.
@@ -20,10 +24,18 @@ public class Zombie : MonoBehaviour
 
     public const float Width = 0.6f, Height = 0.95f;
 
+    // desmembrar: cada armadilha arranca uma parte sorteada entre as que sobram
+    static readonly Limb[] Parts = { Limb.BackArm, Limb.FrontArm, Limb.BackLeg, Limb.FrontLeg, Limb.Head };
+    const float HurtInvulnerable = 1f, HurtPushX = 7f, HurtPushY = 9f, HurtLock = 0.25f;
+    // [quantas pernas/braços ainda tem]: sem perna anda e pula menos; sem braço o pulo na parede enfraquece ou some
+    static readonly float[] LegSpeed = { 0.45f, 0.8f, 1f }, LegJump = { 0.55f, 0.82f, 1f }, ArmWallJump = { 0f, 0.85f, 1f };
+
     public int Index;
     public InputSource Controls;
     public ZombieState State = ZombieState.Alive;
     public bool ControlsEnabled = true;
+    /// <summary>Partes já arrancadas.</summary>
+    public Limb Missing { get; private set; }
 
     public static readonly List<Zombie> All = new List<Zombie>();
 
@@ -33,7 +45,7 @@ public class Zombie : MonoBehaviour
     Transform visual;
     Sprite[] frames;
 
-    float coyoteTimer, jumpBufferTimer, controlLockTimer, springCooldown, animTime, danceTime;
+    float coyoteTimer, jumpBufferTimer, controlLockTimer, springCooldown, animTime, danceTime, hurtTimer;
     int dance = -1, lastDance = -1;   // dança atual (-1 = não está dançando)
     bool grounded, wasGrounded, jumpCut;
     int wallDir;
@@ -56,6 +68,12 @@ public class Zombie : MonoBehaviour
     public Train GroundTrain { get; private set; }
     /// <summary>Gangorra embaixo dos pés (ela usa isso para saber o peso de cada lado), ou null.</summary>
     public Seesaw GroundSeesaw { get; private set; }
+
+    public bool Headless => (Missing & Limb.Head) != 0;
+    /// <summary>Sem cabeça o corpo não enxerga: esquerda e direita trocadas (os bots compensam sozinhos).</summary>
+    public bool ControlsInverted => Headless && (Controls == null || Controls.Kind != DeviceKind.Bot);
+    int Legs => ((Missing & Limb.BackLeg) == 0 ? 1 : 0) + ((Missing & Limb.FrontLeg) == 0 ? 1 : 0);
+    int Arms => ((Missing & Limb.BackArm) == 0 ? 1 : 0) + ((Missing & Limb.FrontArm) == 0 ? 1 : 0);
 
     public static Zombie Spawn(int index, InputSource controls, Vector2 pos)
     {
@@ -131,12 +149,14 @@ public class Zombie : MonoBehaviour
         CheckWalls();
 
         Vector2 move = ControlsEnabled && Controls != null ? Controls.Move : Vector2.zero;
+        if (ControlsInverted) move.x = -move.x;
         float ix = Mathf.Abs(move.x) > 0.25f ? Mathf.Clamp(move.x * 1.25f, -1f, 1f) : 0f;
 
         if (grounded) coyoteTimer = CoyoteTime; else coyoteTimer -= dt;
         jumpBufferTimer -= dt;
         controlLockTimer -= dt;
         springCooldown -= dt;
+        hurtTimer -= dt;
         portalCooldown -= dt;
 
         // velocidade "de base": carona no trem/esteira e vento lateral
@@ -144,7 +164,7 @@ public class Zombie : MonoBehaviour
         if (wind != null) baseVx += wind.Direction.x * wind.SideSpeed;
 
         // ---- horizontal
-        float target = ix * MaxSpeed;
+        float target = ix * MaxSpeed * LegSpeed[Legs];
         float accel;
         if (grounded) accel = onIce ? (ix != 0 ? IceAccel : IceDecel) : (ix != 0 ? GroundAccel : GroundDecel);
         else accel = ix != 0 ? AirAccel : AirDecel;
@@ -161,7 +181,7 @@ public class Zombie : MonoBehaviour
         {
             if (coyoteTimer > 0f)
             {
-                v.y = JumpVelocity;
+                v.y = JumpVelocity * LegJump[Legs];
                 jumpCut = true;
                 coyoteTimer = 0f;
                 jumpBufferTimer = 0f;
@@ -171,10 +191,10 @@ public class Zombie : MonoBehaviour
                 Fx.Dust(Position, 4);
                 if (DemoDriver.Active) Debug.Log($"[Demo] P{Index + 1} pulou em {Position} vx={v.x:0.0}");
             }
-            else if (wallDir != 0)
+            else if (wallDir != 0 && Arms > 0)
             {
-                v.x = -wallDir * WallJumpX;
-                v.y = WallJumpY;
+                v.x = -wallDir * WallJumpX * ArmWallJump[Arms];
+                v.y = WallJumpY * ArmWallJump[Arms];
                 jumpCut = true;
                 jumpBufferTimer = 0f;
                 controlLockTimer = WallJumpLock;
@@ -201,7 +221,7 @@ public class Zombie : MonoBehaviour
         v.y -= g * dt;
 
         float maxFall = MaxFall;
-        bool sliding = wallDir != 0 && !grounded && v.y < 0f && ix != 0 && Mathf.Sign(ix) == wallDir;
+        bool sliding = wallDir != 0 && Arms > 0 && !grounded && v.y < 0f && ix != 0 && Mathf.Sign(ix) == wallDir;
         if (sliding) maxFall = WallSlideSpeed;
         if (v.y < -maxFall) v.y = Mathf.MoveTowards(v.y, -maxFall, 120f * dt);
 
@@ -297,9 +317,9 @@ public class Zombie : MonoBehaviour
             }
 
             var hazard = h.GetComponent<Hazard>();
-            if (hazard != null && hazard.isActiveAndEnabled)
+            if (hazard != null && hazard.isActiveAndEnabled && (hurtTimer <= 0f || hazard.Deadly))
             {
-                Die(hazard.Owner);
+                Hurt(hazard, h);
                 return;
             }
 
@@ -338,6 +358,53 @@ public class Zombie : MonoBehaviour
 
     static bool IsZombie(Collider2D c) => c.attachedRigidbody != null && c.attachedRigidbody.GetComponent<Zombie>() != null;
 
+    // ------------------------------------------------------------------ desmembrar
+
+    /// <summary>Encostou numa armadilha: perde uma parte sorteada (pode ser a cabeça). Sem nada para arrancar, morre.</summary>
+    void Hurt(Hazard hazard, Collider2D c)
+    {
+        if (hazard.Deadly) { Die(hazard.Owner); return; }
+        var left = System.Array.FindAll(Parts, p => (Missing & p) == 0);
+        if (left.Length == 0) { Die(hazard.Owner); return; }
+        LoseLimb(left[Random.Range(0, left.Length)], c.bounds.center);
+    }
+
+    void LoseLimb(Limb limb, Vector2 from)
+    {
+        Missing |= limb;
+        frames = Art.ZombieFrames(Index, (int)Missing);
+        hurtTimer = HurtInvulnerable;
+        dance = -1;
+
+        // empurrado para longe da armadilha, um pouco para cima
+        float dir = Mathf.Abs(Position.x - from.x) > 0.05f ? Mathf.Sign(Position.x - from.x) : (faceRight ? -1f : 1f);
+        rb.linearVelocity = new Vector2(dir * HurtPushX, HurtPushY);
+        controlLockTimer = HurtLock;
+        jumpCut = false;
+        coyoteTimer = 0f;
+
+        int part = limb == Limb.Head ? 2 : limb == Limb.BackArm || limb == Limb.FrontArm ? 0 : 1;
+        Vector2 at = Position + Vector2.up * (part == 2 ? 0.85f : part == 0 ? 0.6f : 0.15f);
+        Fling(part, at, -dir);
+        Fx.Burst(at, new Color(0.55f, 0.08f, 0.1f), 10, 6f, 0.14f);
+        Sfx.PlayVar("crack");
+        GameManager.Shake(0.08f);
+        if (DemoDriver.Active) Debug.Log($"[Demo] P{Index + 1} perdeu {limb} em {Position}");
+        if (GameManager.Instance != null) GameManager.Instance.OnZombieHurt(this, limb);
+    }
+
+    /// <summary>Pedaço do zumbi voando (0 braço, 1 perna, 2 cabeça, 3 tronco) para o lado 'side'.</summary>
+    void Fling(int part, Vector2 at, float side)
+    {
+        var piece = Fx.Spawn(Art.ZombiePart(Index, part), at, Color.white, 1f, 15);
+        piece.GetComponent<SpriteRenderer>().flipX = side < 0f;
+        piece.Velocity = new Vector2(side * Random.Range(1.5f, 4f), Random.Range(8f, 12f));
+        piece.Gravity = 30f;
+        piece.Spin = Random.Range(300f, 700f) * (Random.value < 0.5f ? -1f : 1f);
+        piece.Life = 2f;
+        piece.Shrink = false;
+    }
+
     // ------------------------------------------------------------------ fim da corrida
 
     public void Die(int killer)
@@ -349,13 +416,11 @@ public class Zombie : MonoBehaviour
         Vector2 center = Position + Vector2.up * 0.5f;
         Fx.Burst(center, new Color(0.55f, 0.08f, 0.1f), 14, 7f, 0.16f);
         Fx.Burst(center, Art.PlayerColor(Index), 8, 6f, 0.14f);
-        var corpse = Fx.Spawn(sr.sprite, Position, Color.white, 1f, 15);
-        corpse.GetComponent<SpriteRenderer>().flipX = sr.flipX;
-        corpse.Velocity = new Vector2(Random.Range(-3f, 3f), 11f);
-        corpse.Gravity = 30f;
-        corpse.Spin = Random.Range(300f, 600f) * (Random.value < 0.5f ? -1f : 1f);
-        corpse.Life = 1.4f;
-        corpse.Shrink = false;
+        // se despedaça: tronco e o que ainda sobrava de cabeça, braços e pernas
+        if (!Headless) Fling(2, Position + Vector2.up * 0.8f, Random.value < 0.5f ? -1f : 1f);
+        Fling(3, Position + Vector2.up * 0.45f, Random.value < 0.5f ? -1f : 1f);
+        foreach (var l in new[] { Limb.BackArm, Limb.FrontArm, Limb.BackLeg, Limb.FrontLeg })
+            if ((Missing & l) == 0) Fling(l == Limb.BackArm || l == Limb.FrontArm ? 0 : 1, Position + Vector2.up * 0.4f, Random.value < 0.5f ? -1f : 1f);
         Sfx.PlayVar("death");
         GameManager.Shake(0.12f);
 
@@ -382,6 +447,7 @@ public class Zombie : MonoBehaviour
         animTime += dt;
         Vector2 v = rb.linearVelocity;
         Vector2 move = ControlsEnabled && Controls != null ? Controls.Move : Vector2.zero;
+        if (ControlsInverted) move.x = -move.x;
         if (controlLockTimer <= 0f)
         {
             if (move.x > 0.25f) faceRight = true;
@@ -389,12 +455,15 @@ public class Zombie : MonoBehaviour
         }
         else if (Mathf.Abs(v.x) > 0.5f) faceRight = v.x > 0f;
 
+        // piscando enquanto não leva dano depois de perder uma parte
+        sr.color = hurtTimer > 0f && (int)(hurtTimer * 12f) % 2 == 0 ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
+
         // dança sem parar até andar ou sair do chão (pular, mola, vento...)
         if (Mathf.Abs(move.x) > 0.25f || !grounded) dance = -1;
         if (dance >= 0)
         {
             danceTime += dt;
-            sr.sprite = Art.DanceSprite(Index, dance, danceTime);
+            sr.sprite = Art.DanceSprite(Index, dance, danceTime, (int)Missing);
             sr.flipX = !faceRight;
             squash = Vector3.Lerp(squash, Vector3.one, dt * 12f);
             visual.localScale = squash;

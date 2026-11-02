@@ -35,7 +35,8 @@ public static class ItemFactory
                 var hz = Child(root, "Pontas", new Vector2(0f, 0.1f));
                 var t = hz.AddComponent<BoxCollider2D>();
                 t.isTrigger = true;
-                t.size = new Vector2(0.8f, 0.55f);
+                // pontas um pouco mais largas que a base: quem encosta de lado também se machuca
+                t.size = new Vector2(1.1f, 0.55f);
                 hz.AddComponent<Hazard>();
                 break;
             }

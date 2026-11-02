@@ -754,6 +754,13 @@ public partial class GameManager : MonoBehaviour
         }
     }
 
+    /// <summary>Zumbi perdeu uma parte numa armadilha. Não dá ponto: o ponto de armadilha é só quando ela mata.</summary>
+    public void OnZombieHurt(Zombie z, Limb limb)
+    {
+        string what = limb == Limb.Head ? "A CABEÇA" : limb == Limb.BackArm || limb == Limb.FrontArm ? "O BRAÇO" : "A PERNA";
+        AddFloat(z.Position + Vector2.up * 1.4f, $"LÁ SE VAI {what}!", Art.PlayerColor(z.Index), 22, 1.1f);
+    }
+
     /// <summary>Bot empacado (fase impossível para ele): desiste e o zumbi explode, para a rodada poder acabar.</summary>
     public void GiveUp(PlayerSlot p)
     {

@@ -5,8 +5,9 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// Teste automático do criador de fases, só com -zumbiCreatorTest [-zumbiShots pasta]: passa por todas as telas,
-/// confere cada passo no log ("[Teste] OK"/"[Teste] FALHOU") e fecha. -zumbiMapFile fase.txt deixa a fase escolhida no lobby.
+/// Testes automáticos [-zumbiShots pasta]: -zumbiCreatorTest passa por todas as telas do criador de fases e
+/// -zumbiLimbTest leva um zumbi às armadilhas (perder partes e morrer). Conferem cada passo no log
+/// ("[Teste] OK"/"[Teste] FALHOU") e fecham. -zumbiMapFile fase.txt deixa a fase escolhida no lobby.
 /// </summary>
 public partial class GameManager
 {
@@ -35,11 +36,113 @@ public partial class GameManager
             else Debug.LogError("[Teste] o arquivo não tem uma fase: " + mapFile);
         }
 
+        testShots = Arg("-zumbiShots");
+        if (args.Contains("-zumbiLimbTest")) { MapCode.TestMode = true; StartCoroutine(LimbTest()); return; }
         if (!args.Contains("-zumbiCreatorTest")) return;
         MapCode.TestMode = true;
         MapCode.ClearTest();
-        testShots = Arg("-zumbiShots");
         StartCoroutine(CreatorTest());
+    }
+
+    /// <summary>Põe o zumbi do desafio com os pés em (x, y) do mundo.</summary>
+    void TestPlaceZombie(Vector2 feet)
+    {
+        challengeZombie.transform.position = feet;
+        challengeZombie.GetComponent<Rigidbody2D>().position = feet;
+        challengeZombie.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
+        Physics2D.SyncTransforms();
+    }
+
+    IEnumerator LimbTest()
+    {
+        yield return new WaitForSeconds(0.5f);
+        var map = MapCode.NewMap("Teste das partes");
+        MapCode.Set(map, 12, 3, '^');
+        MapCode.Set(map, 13, 3, '^');
+        MapCode.Set(map, 30, 5, 'X');
+        for (int x = 36; x <= 38; x++) MapCode.Set(map, x, 2, 'a');
+        var bot = new InputSource { Kind = DeviceKind.Bot };
+        challengeInput = bot;
+        StartChallenge(map, 0, ChallengeReturn.Received);
+        yield return TestShot("p01_inteiro");
+
+        // ---- andando para os espinhos: cada golpe arranca uma parte sorteada; sem nada para arrancar, morre
+        var z = challengeZombie;
+        bot.BotMove = Vector2.right;
+        float start = Time.time, firstLoss = -1f;
+        var lost = new System.Collections.Generic.List<Limb>();
+        Limb seen = 0;
+        bool onePerHit = true, invertedOk = false;
+        float until = Time.time + 40f, lastChange = Time.time;
+        while (challengeDeaths == 0 && Time.time < until)
+        {
+            // parado sem levar golpe: registra onde está e a distância até as pontas do espinho
+            if (Time.time - lastChange > 2f && z != null)
+            {
+                lastChange = Time.time;
+                var body = z.GetComponent<CapsuleCollider2D>();
+                foreach (var hz in FindObjectsByType<Hazard>(FindObjectsSortMode.None))
+                {
+                    var col = hz.GetComponent<Collider2D>();
+                    if (col != null && Vector2.Distance(col.bounds.center, z.Position) < 2f)
+                        Debug.Log($"[Teste] parado em {z.Position.x:0.000} (vel {z.Velocity.x:0.00}), distância até {hz.name}: {Physics2D.Distance(body, col).distance:0.000}");
+                }
+            }
+
+            if (z != null && z.Missing != seen)
+            {
+                lastChange = Time.time;
+                int added = 0;
+                foreach (Limb l in Enum.GetValues(typeof(Limb)))
+                    if ((z.Missing & l) != 0 && (seen & l) == 0) { lost.Add(l); added++; }
+                onePerHit &= added == 1;
+                seen = z.Missing;
+                if (firstLoss < 0f) firstLoss = Time.time - start;
+                Debug.Log($"[Teste] perdeu: {string.Join(", ", lost)}");
+                if (lost[lost.Count - 1] == Limb.Head)
+                {
+                    // sem cabeça: jogador fica com os controles trocados, bot não
+                    bool botOk = !z.ControlsInverted;
+                    z.Controls = new InputSource { Kind = DeviceKind.Keyboard1 };
+                    invertedOk = botOk && z.ControlsInverted;
+                    z.Controls = bot;
+                }
+                // depois de 1 s o zumbi já caiu e parou de piscar
+                yield return new WaitForSeconds(0.8f);
+                yield return TestShot($"p0{1 + lost.Count}_sem_{lost.Count}");
+            }
+            yield return null;
+        }
+        Check(firstLoss >= 0f && firstLoss < 4f, $"andando de lado contra o espinho perde uma parte logo ({firstLoss:0.0} s)");
+        Check(onePerHit && lost.Count == 5 && seen == (Limb.BackArm | Limb.FrontArm | Limb.BackLeg | Limb.FrontLeg | Limb.Head),
+              "cada golpe arranca uma parte, até as 5 (ordem sorteada: " + string.Join(", ", lost) + ")");
+        Check(invertedOk, "sem cabeça o jogador fica com esquerda e direita trocadas, o bot não");
+        Check(challengeDeaths == 1, "sem nada para arrancar, o próximo golpe mata");
+        bot.BotMove = Vector2.zero;
+        yield return new WaitForSeconds(1.2f);
+        Check(challengeZombie != null && challengeZombie != z && challengeZombie.Missing == 0, "renasce com o corpo inteiro");
+
+        // ---- serra: arranca uma parte e o zumbi continua
+        var z2 = challengeZombie;
+        yield return new WaitForFixedUpdate();
+        TestPlaceZombie(new Vector2(Level.Origin.x + 30.5f, Level.Origin.y + 4.3f));
+        yield return new WaitForSeconds(0.3f);
+        int bits = 0;
+        foreach (Limb l in Enum.GetValues(typeof(Limb))) if ((z2.Missing & l) != 0) bits++;
+        Check(challengeDeaths == 1 && z2.State == ZombieState.Alive && bits == 1, $"serra arranca uma parte e o zumbi continua ({z2.Missing})");
+        yield return new WaitForSeconds(1.5f);
+        yield return TestShot("p07_depois_da_serra");
+
+        // ---- ácido: afunda e morre, sem perder mais parte
+        var before = z2.Missing;
+        yield return new WaitForFixedUpdate();
+        TestPlaceZombie(new Vector2(Level.Origin.x + 37.5f, Level.Origin.y + 3.5f));
+        until = Time.time + 2f;
+        while (challengeDeaths < 2 && Time.time < until) yield return null;
+        Check(challengeDeaths == 2 && z2.State == ZombieState.Dead && z2.Missing == before, "ácido mata direto");
+
+        Debug.Log($"[Teste] FIM: {testChecks - testFails} de {testChecks} passaram");
+        Application.Quit(testFails == 0 ? 0 : 1);
     }
 
     void Check(bool ok, string what)
