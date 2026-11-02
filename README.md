@@ -94,6 +94,19 @@ Dá para montar a fase com qualquer teclado, controle ou mouse:
   pasta). No navegador, exportar baixa o arquivo e importar abre a janela para escolher o arquivo; copiar e colar
   abre uma caixinha do próprio navegador quando ele não deixa usar a área de transferência direto.
 
+## Armadilhas: o zumbi perde as partes
+
+Zumbi não morre fácil: cada armadilha arranca **uma parte sorteada** entre as que sobram (braços, pernas e cabeça),
+então dá para perder a cabeça logo no primeiro golpe.
+
+- Sem uma perna o zumbi anda e pula menos; sem as duas ele se arrasta e quase não pula. Sem um braço o pulo na parede
+  fica mais fraco; sem os dois, não escala parede.
+- **Sem cabeça** o corpo continua, mas não enxerga: **esquerda e direita ficam trocadas** (a cabeça não volta).
+- Sem nenhuma parte para arrancar, o próximo golpe **mata**. **Ácido** e **cair para fora da fase** matam direto.
+  Na morte o zumbi se despedaça.
+- Depois de perder uma parte ele é empurrado para longe da armadilha e fica 1 segundo piscando, sem levar dano.
+- O ponto de armadilha só vale quando ela **mata**; arrancar uma parte não dá ponto.
+
 ## Pontuação
 
 | Situação | Pontos |
@@ -286,7 +299,7 @@ Assets/
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
       MapCode.cs         fases criadas: código e texto, salvas, recebidas, recordes, arquivos e trens automáticos
       GameManager.Editor.cs  criador de fases e desafio solo contra o relógio
-      GameManager.Test.cs    teste automático do criador (só liga com -zumbiCreatorTest)
+      GameManager.Test.cs    testes automáticos do criador e das partes (-zumbiCreatorTest, -zumbiLimbTest)
       Level.cs           monta a fase a partir do mapa, grade de ocupação, fundo
       Train.cs           trem fantasma (vai e volta, carona no teto, pontas mortais)
       Bots/              IA dos bots: NavGrid (mapa de navegação e simulação de pulos),
@@ -323,7 +336,8 @@ jogador de teste que aperta os botões sozinho). Para testar o online sem abrir 
 `-zumbiWin N` (pontos para vencer), `-zumbiMap N` (0 a 4 = mapa, 5 = aleatório),
 `-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots).
 
-`-zumbiCreatorTest` testa o criador de fases sozinho (montar com itens, desfazer, aviso de caminho, testar, desistir,
+`-zumbiLimbTest` leva um zumbi aos espinhos, a uma serra na altura da cabeça e ao ácido e confere as partes que
+ele perde, os controles trocados sem cabeça e quando morre. `-zumbiCreatorTest` testa o criador de fases sozinho (montar com itens, desfazer, aviso de caminho, testar, desistir,
 copiar, colar, exportar, importar, fases recebidas e partida em grupo com bots), escreve `[Teste] OK`/`[Teste] FALHOU`
 no log, tira prints com `-zumbiShots` e fecha. `-zumbiMapFile fase.txt` deixa uma fase criada escolhida no lobby
 (junto com `-zumbiDemo -zumbiHostIp`, testa o host mandando a fase para o cliente). Nos dois, as fases e os recordes
