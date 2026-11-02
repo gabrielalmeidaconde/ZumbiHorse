@@ -38,11 +38,38 @@ public static class Sfx
             float f = 92 + 14 * Mathf.Sin(t * 6f) - 25 * t;
             return (Saw(f, t) * 0.6f + Saw(f * 1.5f, t) * 0.25f) * Mathf.Clamp01(t * 8f) * Env(t, 0.75f) * 0.35f;
         });
-        Add("portal", 0.35f, t => Sine(300 + 900 * t / 0.35f + 60 * Mathf.Sin(t * 90), t) * Env(t, 0.35f) * 0.4f);
+        // portal: desce (entrando) e sobe (saindo), com um brilho por cima
+        Add("portal", 0.42f, t =>
+        {
+            float f = t < 0.16f ? Lerp(1100, 260, t / 0.16f) : Lerp(260, 1500, (t - 0.16f) / 0.26f);
+            return (Sine(f + 70 * Mathf.Sin(t * 110), t) * 0.7f + Sine(f * 2.01f, t) * 0.2f * Env(t, 0.42f)) * Mathf.Clamp01(t * 60f) * Env(t, 0.42f) * 0.42f;
+        });
         Add("crack", 0.18f, t => (Noise() * 0.7f + Square(90, t) * 0.3f) * Env(t, 0.18f) * Env(t, 0.18f) * 0.6f);
         Add("flame", 0.6f, t => LowNoise(0.3f) * Mathf.Clamp01(t * 15f) * Env(t, 0.6f) * 0.6f);
         Add("horn", 0.5f, t => (Square(185, t) * 0.5f + Square(233, t) * 0.5f) * Mathf.Clamp01(t * 20f) * Env(t, 0.5f) * 0.25f);
         Add("join", 0.3f, t => Square(Arp(t, 0.07f, 392, 523, 659, 784), t) * Env(t, 0.3f) * 0.25f);
+
+        // ---- passos e pousos: chão, gelo e esteira
+        Add("step", 0.05f, t => (LowNoise(0.35f) * 0.7f + Sine(Lerp(140, 70, t / 0.05f), t) * 0.5f) * Env(t, 0.05f) * 0.35f);
+        Add("step_ice", 0.09f, t => (Sine(Lerp(2100, 1500, t / 0.09f), t) * 0.35f + Noise() * 0.25f) * Env(t, 0.09f) * Env(t, 0.09f) * 0.3f);
+        Add("step_belt", 0.06f, t => (Square(Lerp(260, 180, t / 0.06f), t) * 0.4f + Square(397, t) * 0.25f) * Env(t, 0.06f) * Env(t, 0.06f) * 0.3f);
+        Add("land_ice", 0.16f, t => (Sine(2240, t) * 0.5f + Sine(3360, t) * 0.3f + Noise() * 0.3f * Env(t, 0.03f)) * Env(t, 0.16f) * Env(t, 0.16f) * 0.35f);
+        Add("land_belt", 0.16f, t => (Square(Lerp(180, 120, t / 0.16f), t) * 0.4f + Square(271, t) * 0.3f + Noise() * 0.3f * Env(t, 0.03f)) * Env(t, 0.16f) * Env(t, 0.16f) * 0.4f);
+        // vento do ventilador: um "fuuu" que cresce e some
+        Add("wind", 0.5f, t => LowNoise(0.12f + 0.25f * Mathf.Sin(t / 0.5f * Mathf.PI)) * Mathf.Sin(t / 0.5f * Mathf.PI) * 0.5f);
+        // caixa podre: madeira chacoalhando, desmoronando e voltando
+        Add("rattle", 0.45f, t => (Noise() * 0.6f + Square(140, t) * 0.4f) * (Mathf.Repeat(t * 28f, 1f) < 0.35f ? 1f : 0.15f) * Mathf.Lerp(0.5f, 1f, t / 0.45f) * 0.32f);
+        Add("crumble", 0.4f, t => (LowNoise(0.25f) * 0.8f + Noise() * 0.3f * Env(t, 0.1f) + Sine(Lerp(110, 45, t / 0.4f), t) * 0.4f) * Env(t, 0.4f) * 0.55f);
+        Add("pop", 0.12f, t => Square(Lerp(380, 760, t / 0.12f), t) * Env(t, 0.12f) * 0.22f);
+        // blocos com física: plataforma móvel virando na ponta e gangorra batendo no limite
+        Add("clunk", 0.14f, t => (Sine(Lerp(150, 80, t / 0.14f), t) * 0.7f + Square(330, t) * 0.2f * Env(t, 0.04f) + Noise() * 0.2f * Env(t, 0.03f)) * Env(t, 0.14f) * 0.45f);
+        Add("thud", 0.2f, t => (Sine(Lerp(85, 40, t / 0.2f), t) * 0.8f + LowNoise(0.3f) * 0.4f * Env(t, 0.06f)) * Env(t, 0.2f) * 0.6f);
+        // ácido (chiado com bolhas) e serra raspando
+        Add("sizzle", 0.6f, t => (Noise() * 0.5f * Env(t, 0.6f) + Sine(500 + 400 * Mathf.Repeat(t * 13f, 1f), t) * 0.25f * (Mathf.Repeat(t * 13f, 1f) < 0.4f ? 1f : 0f)) * Mathf.Clamp01(t * 40f) * Env(t, 0.6f) * 0.45f);
+        Add("spark", 0.16f, t => (Square(2600 + 500 * Mathf.Sin(t * 400), t) * 0.3f + Noise() * 0.5f) * Env(t, 0.16f) * Env(t, 0.16f) * 0.3f);
+        // primeiro a chegar no cérebro
+        Add("first", 0.9f, t => (Square(Arp(t, 0.1f, 784, 988, 1175, 1568, 1568, 1568, 1319, 1568, 1568), t) * 0.55f +
+                                 Sine(Arp(t, 0.3f, 392, 494, 587), t) * 0.4f) * Mathf.Clamp01(t * 50f) * Env(t, 0.9f) * 0.3f);
     }
 
     /// <summary>Avisado a cada som tocado (o host do multiplayer online repassa para os clientes).</summary>

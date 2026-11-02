@@ -47,7 +47,7 @@ public static class ItemFactory
                 var cc = hz.AddComponent<CircleCollider2D>();
                 cc.isTrigger = true;
                 cc.radius = 0.5f;
-                hz.AddComponent<Hazard>();
+                hz.AddComponent<Hazard>().Sparks = true;
                 var blade = AddSprite(hz, Art.Saw, Vector2.zero, 6);
                 blade.gameObject.AddComponent<Spinner>().DegreesPerSecond = -420f;
                 break;

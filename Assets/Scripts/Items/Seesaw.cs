@@ -9,6 +9,7 @@ public class Seesaw : RunBehaviour
 {
     public const float MaxAngle = 22f;
     const float Weight = 260f, Spring = 6f, Damping = 2.5f;
+    const float ThudSpeed = 25f; // graus/s: abaixo disso ela só encosta, sem barulho
 
     public Rigidbody2D Plank;
 
@@ -30,6 +31,15 @@ public class Seesaw : RunBehaviour
         Plank.transform.localRotation = Quaternion.identity;
     }
 
+    /// <summary>A ponta que desceu bate no apoio: baque e poeira nela.</summary>
+    void Thud(float strength)
+    {
+        Sfx.PlayVar("thud", 0.3f + 0.4f * strength);
+        float side = angle > 0f ? -1f : 1f; // ângulo positivo = lado esquerdo desceu
+        Vector2 end = Plank.position + (Vector2)(Plank.transform.right * side * 2.4f);
+        Fx.Dust(end + Vector2.down * 0.2f, 4);
+    }
+
     void FixedUpdate()
     {
         if (!running) return;
@@ -42,8 +52,10 @@ public class Seesaw : RunBehaviour
         // peso à direita (torque > 0) gira no sentido horário, ou seja, ângulo negativo
         angVel += (-torque * Weight - angle * Spring - angVel * Damping) * dt;
         angle += angVel * dt;
-        if (angle > MaxAngle) { angle = MaxAngle; if (angVel > 0f) angVel = 0f; }
-        else if (angle < -MaxAngle) { angle = -MaxAngle; if (angVel < 0f) angVel = 0f; }
+        float hitSpeed = 0f;
+        if (angle > MaxAngle) { angle = MaxAngle; if (angVel > 0f) { hitSpeed = angVel; angVel = 0f; } }
+        else if (angle < -MaxAngle) { angle = -MaxAngle; if (angVel < 0f) { hitSpeed = -angVel; angVel = 0f; } }
+        if (hitSpeed > ThudSpeed) Thud(Mathf.Clamp01(hitSpeed / 120f));
         maxSeen = Mathf.Max(maxSeen, Mathf.Abs(angle));
         if (DemoDriver.Active && !logged && Mathf.Abs(angle) >= MaxAngle)
         {
