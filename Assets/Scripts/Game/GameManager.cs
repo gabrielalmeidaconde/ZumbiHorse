@@ -60,8 +60,10 @@ public partial class GameManager : MonoBehaviour
     public readonly List<PlayerSlot> Players = new List<PlayerSlot>();
     public IReadOnlyList<ItemInstance> BoxItems => boxItems;
 
-    /// <summary>Mapa escolhido no lobby; Maps.All.Length = aleatório.</summary>
+    /// <summary>Mapa escolhido no lobby (índice em lobbyMaps); lobbyMaps.Count = aleatório.</summary>
     public int MapIndex { get; private set; }
+    /// <summary>Mapas do lobby: os do jogo, depois as fases criadas e as recebidas.</summary>
+    readonly List<MapDef> lobbyMaps = new List<MapDef>();
     /// <summary>Só para testes: força os itens da caixa.</summary>
     public static List<ItemType> ForcedBox;
     /// <summary>Só para testes: deixa a partida começar só com bots.</summary>
@@ -112,6 +114,8 @@ public partial class GameManager : MonoBehaviour
         gameObject.AddComponent<BotSystem>();
         gameObject.AddComponent<NetGame>();
         Level.Build(Maps.All[0]);
+        RefreshLobbyMaps();
+        TryStartCreatorTest();
         DemoDriver.TryAttach(this);
     }
 
@@ -212,7 +216,12 @@ public partial class GameManager : MonoBehaviour
         {
             if (devices.Any(d => d.BackDown))
             {
-                if (Phase == Phase.Challenge) { SetPaused(false); ExitChallenge(); }
+                if (Phase == Phase.Challenge)
+                {
+                    SetPaused(false);
+                    if (challengeDone) ExitChallenge();
+                    else EndChallenge(false);
+                }
                 else BackToLobby();
                 return true;
             }
@@ -332,13 +341,41 @@ public partial class GameManager : MonoBehaviour
     /// <summary>Escolhe o mapa (com volta) e mostra ele atrás do lobby.</summary>
     public void SetMap(int index)
     {
-        int n = Maps.All.Length + 1;
+        int n = lobbyMaps.Count + 1;
         MapIndex = ((index % n) + n) % n;
-        if (MapIndex < Maps.All.Length) Level.Build(Maps.All[MapIndex]);
+        if (MapIndex < lobbyMaps.Count) Level.Build(lobbyMaps[MapIndex]);
         Sfx.Play("tick");
     }
 
-    MapDef SelectedMap => MapIndex < Maps.All.Length ? Maps.All[MapIndex] : Level.Map;
+    MapDef SelectedMap => MapIndex < lobbyMaps.Count ? lobbyMaps[MapIndex] : Level.Map;
+
+    /// <summary>Remonta a lista de mapas do lobby e escolhe 'select' (ou mantém o escolhido, se ele ainda existe).</summary>
+    void RefreshLobbyMaps(MapDef select = null)
+    {
+        bool random = lobbyMaps.Count > 0 && MapIndex >= lobbyMaps.Count;
+        uint keep = select != null ? MapCode.Hash(select) : MapIndex < lobbyMaps.Count ? MapCode.Hash(lobbyMaps[MapIndex]) : 0;
+        lobbyMaps.Clear();
+        lobbyMaps.AddRange(Maps.All);
+        var seen = new HashSet<uint>(Maps.All.Select(MapCode.Hash));
+        for (int i = 0; i < MapCode.Slots; i++)
+        {
+            var m = MapCode.LoadSlot(i, out _);
+            if (m == null || !seen.Add(MapCode.Hash(m))) continue;
+            m.Description = "Fase criada por você";
+            lobbyMaps.Add(m);
+        }
+        foreach (var r in MapCode.LoadReceived())
+        {
+            if (!seen.Add(MapCode.Hash(r.Map))) continue;
+            r.Map.Description = "Fase recebida de um amigo";
+            lobbyMaps.Add(r.Map);
+        }
+        int found = lobbyMaps.FindIndex(m => MapCode.Hash(m) == keep);
+        MapIndex = select == null && random ? lobbyMaps.Count : Mathf.Max(0, found);
+    }
+
+    /// <summary>A fase atual, se ela não é um dos mapas do jogo (o host manda ela para os clientes).</summary>
+    public MapDef CustomMap => System.Array.IndexOf(Maps.All, Level.Map) < 0 ? Level.Map : null;
 
     void StartMatch()
     {
@@ -347,16 +384,18 @@ public partial class GameManager : MonoBehaviour
         nobodyLastRound = false;
         foreach (var p in Players) { p.Score = 0; p.PrevScore = 0; p.Ready = false; }
         ClearRoundObjects();
-        Level.Build(MapIndex < Maps.All.Length ? Maps.All[MapIndex] : Maps.All[Random.Range(0, Maps.All.Length)]);
+        Level.Build(MapIndex < lobbyMaps.Count ? lobbyMaps[MapIndex] : Maps.All[Random.Range(0, Maps.All.Length)]);
         Sfx.Play("go");
         BeginPick();
     }
 
-    public void BackToLobby()
+    /// <summary>Volta para o lobby; com 'select', já deixa aquela fase escolhida.</summary>
+    public void BackToLobby(MapDef select = null)
     {
         paused = false;
         Time.timeScale = 1f;
         ClearRoundObjects();
+        RefreshLobbyMaps(select);
         Level.Build(SelectedMap);
         foreach (var p in Players) { p.Ready = false; p.Score = 0; p.PrevScore = 0; }
         winner = -1;
@@ -1176,19 +1215,22 @@ public partial class GameManager : MonoBehaviour
         Fill(R(x, y, w, h), new Color(0.08f, 0.06f, 0.13f, 0.88f));
         Fill(R(x, y, w, 4), new Color(0.72f, 0.5f, 0.95f));
 
-        bool random = MapIndex >= Maps.All.Length;
+        // no cliente online a lista é a do host; a fase criada chega pela rede (replicaCustomMap)
+        int count = Replica ? replicaMapCount : lobbyMaps.Count;
+        bool random = MapIndex >= count;
+        MapDef map = random ? null : !Replica ? lobbyMaps[MapIndex] : MapIndex < Maps.All.Length ? Maps.All[MapIndex] : replicaCustomMap;
         float tx = x + 70f, ty = y + 12f, cell = 198f / Level.W; // miniatura sempre do mesmo tamanho
-        if (random)
+        if (map == null)
         {
             Fill(R(tx, ty, Level.W * cell, Level.H * cell), new Color(0.12f, 0.09f, 0.2f));
             Text(R(tx, ty, Level.W * cell, Level.H * cell), "?", 70, new Color(0.85f, 0.7f, 1f));
         }
-        else DrawMapThumbnail(Maps.All[MapIndex], tx, ty, cell);
+        else DrawMapThumbnail(map, tx, ty, cell);
 
-        string name = random ? "Aleatório" : Maps.All[MapIndex].Name;
-        string desc = random ? "Sorteia um dos mapas quando a partida começar." : Maps.All[MapIndex].Description;
+        string name = random ? "Aleatório" : map != null ? map.Name : "Recebendo a fase...";
+        string desc = random ? "Sorteia um dos mapas do jogo quando a partida começar." : map != null ? map.Description : "";
         float textX = tx + Level.W * cell + 30f;
-        Text(R(textX, y + 10, w - (textX - x) - 60, 50), $"MAPA {MapIndex + 1}/{Maps.All.Length + 1}:  {name}", 34, Color.white, TextAnchor.MiddleLeft);
+        Text(R(textX, y + 10, w - (textX - x) - 60, 50), $"MAPA {MapIndex + 1}/{count + 1}:  {name}", 34, Color.white, TextAnchor.MiddleLeft);
         Text(R(textX, y + 58, w - (textX - x) - 60, 32), desc, 21, new Color(0.85f, 0.82f, 0.92f), TextAnchor.MiddleLeft);
         Keys(R(textX, y + 88, w - (textX - x) - 60, 30), "[A] [D]  [<] [>]  ou analógico: trocar mapa", 16, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleLeft);
 
@@ -1251,6 +1293,9 @@ public partial class GameManager : MonoBehaviour
             float tx = Mathf.Lerp(t.FromX, t.ToX + 1 - len, t.StartT);
             Fill(R(x + tx * cell, y + (Level.H - 1 - (t.TrackRow + 1)) * cell, len * cell, cell), new Color(0.55f, 0.35f, 0.85f));
         }
+        foreach (var it in map.Items)
+            foreach (var c in MapCode.ItemCells(it))
+                Fill(R(x + c.x * cell, y + (Level.H - 1 - c.y) * cell, cell, cell), new Color(0.72f, 0.5f, 0.95f));
     }
 
     // ------------------------------------------------------------------ partida
@@ -1481,7 +1526,8 @@ public partial class GameManager : MonoBehaviour
         Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.72f));
         Text(R(0, 110, VW, 110), "PAUSADO", 84, Color.white);
         Keys(R(0, 228, VW, 46), $"[ESC] {{START}} ou {AnyConfirm}  continuar", 26, new Color(0.6f, 1f, 0.5f));
-        Keys(R(0, 280, VW, 46), Phase == Phase.Challenge ? "[Q] [BACKSPACE] {B}  sair do desafio" : "[Q] [BACKSPACE] {B}  sair para o lobby", 26, new Color(1f, 0.6f, 0.5f));
+        string leave = Phase != Phase.Challenge ? "sair para o lobby" : challengeDone ? "sair do desafio" : "desistir";
+        Keys(R(0, 280, VW, 46), "[Q] [BACKSPACE] {B}  " + leave, 26, new Color(1f, 0.6f, 0.5f));
         float h = DrawControls(350f);
         Text(R(0, 350 + h + 20, VW, 36), "Dicas: segure o pulo para ir mais alto  •  encoste na parede e pule para escalar  •  o primeiro a chegar ganha +1", 21, new Color(0.78f, 0.76f, 0.86f));
     }
