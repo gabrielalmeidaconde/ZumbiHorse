@@ -101,6 +101,25 @@ Para a partida não travar:
 - Se **ninguém chegou** na rodada, a próxima caixa de itens sempre traz uma **bomba** para abrir caminho
   (os bots Médio e Difícil sabem mirar a bomba no que está bloqueando a passagem).
 
+## Música
+
+Cada parte da partida tem a sua música (chiptune sintetizada na hora, como os efeitos):
+
+| Quando | Música |
+|---|---|
+| Lobby | Teremim de filme de terror, em lá menor |
+| Caixa de itens, posicionamento, placar e criador de fases | Pizzicato sorrateiro, em ré menor |
+| Corrida e desafio solo | Rápida, em mi menor; fica 20% mais rápida (no mesmo tom) quando aparece "SÓ FALTAM OS BOTS!" |
+| Vitória | Fanfarra em dó maior, depois do som de vitória |
+
+A troca de uma música para outra é com crossfade, e com o jogo pausado a música abaixa. A música toca num
+`AudioSource` separado dos efeitos e tem volume próprio (`Music.Level`, de 0 a 10, salvo em PlayerPrefs).
+No online cada computador toca a música pela fase que recebe do host (ela não passa pela rede).
+No navegador o som só começa depois do primeiro clique ou tecla (regra dos navegadores), e a música começa do início nessa hora.
+
+Para mudar uma música ou escrever outra, edite as partituras em texto no fim de `MusicSynth.cs`: acordes,
+melodia (`nota:passos`, em semicolcheias) e padrões de baixo, arpejo e bateria (um caractere por semicolcheia).
+
 ## Jogadores e controles
 
 No lobby, cada jogador aperta CONFIRMAR para entrar e CONFIRMAR de novo para ficar pronto.
@@ -255,7 +274,7 @@ Se copiar os scripts para outro projeto sem esse pacote, só os dois lados do te
 
 ## Estrutura
 
-Tudo (pixel art, sons, fase e interface) é gerado por código, sem nenhum asset externo.
+Tudo (pixel art, sons, músicas, fase e interface) é gerado por código, sem nenhum asset externo.
 
 ```
 Assets/
@@ -266,6 +285,8 @@ Assets/
       GameInput.cs       InputSource: teclado WASD, teclado setas, controles (Input System)
       Art.cs             pixel art procedural (zumbis, blocos, armadilhas, cenário)
       Sfx.cs             efeitos sonoros sintetizados
+      Music.cs           música de fundo: escolhe a faixa pela fase, crossfade, volume próprio
+      MusicSynth.cs      sintetizador chiptune e as partituras das músicas (em texto)
       FxParticle.cs      partículas, poeira, explosões
       Clipboard.cs       copiar/colar (no navegador usa Plugins/WebGL/Clipboard.jslib)
       Spinner.cs         gira/balança/desliza objetos
