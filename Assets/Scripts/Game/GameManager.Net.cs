@@ -137,6 +137,8 @@ public partial class GameManager
         w.Write(placeTimer);
         w.Write(runTimer);
         w.Write((byte)((paused ? 1 : 0) | (botsOnly ? 2 : 0) | (nobodyLastRound ? 4 : 0) | (AllowBotsOnly ? 8 : 0)));
+        w.Write((byte)menuScreen);   // menu de pausa: qual tela e qual item (quem mexe é o host)
+        w.Write((byte)menuSel);
         w.Write((byte)WinScore);
         w.Write(shake);
         w.Write(roundMessage ?? "");
@@ -190,6 +192,10 @@ public partial class GameManager
         botsOnly = (flags & 2) != 0;
         nobodyLastRound = (flags & 4) != 0;
         replicaBotsOnly = (flags & 8) != 0;
+        var screen = (MenuScreen)r.ReadByte();
+        if (screen != menuScreen) transitionTime = Time.unscaledTime;
+        menuScreen = screen;
+        menuSel = r.ReadByte();
         WinScore = r.ReadByte();
         shake = r.ReadSingle();
         roundMessage = r.ReadString();
