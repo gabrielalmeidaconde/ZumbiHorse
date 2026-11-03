@@ -923,10 +923,15 @@ public partial class GameManager
         // barra de cima: nome e estado da fase, peça escolhida e botões
         Fill(R(0, 0, VW, EditTopH), new Color(0.05f, 0.03f, 0.09f, 0.88f));
         string status = editTimeMs > 0 ? $"seu tempo: {Secs(editTimeMs)}" : "ainda não testada";
-        Text(R(24, 0, 600, EditTopH), $"{editMap.Name.ToUpper()}  ·  {status}", 22, new Color(0.55f, 0.92f, 0.4f), TextAnchor.MiddleLeft);
+        string mapLabel = $"{editMap.Name.ToUpper()}  ·  {status}";
+        Text(R(24, 0, 600, EditTopH), mapLabel, 22, new Color(0.55f, 0.92f, 0.4f), TextAnchor.MiddleLeft);
         string pieceName = CurrentPiece.Name.ToUpper();
         if (CurrentPiece.IsItem && ItemDefs.Get(CurrentPiece.Item).CanRotate) pieceName += $"  ·  giro {itemRot * 90}°";
-        Text(R(0, 0, VW, EditTopH), pieceName, 26, Color.white);
+        // a peça vai no espaço entre o nome da fase e os botões (em tela estreita o meio da tela fica atrás deles)
+        float left = 24f + TextWidth(mapLabel, 22) / S + 24f, right = VW - 760f - 24f;
+        float half = TextWidth(pieceName, 26) / S / 2f;
+        if (VW / 2f - half >= left && VW / 2f + half <= right) Text(R(0, 0, VW, EditTopH), pieceName, 26, Color.white);
+        else Text(R(left, 0, right - left, EditTopH), pieceName, FitSize(pieceName, 26, right - left, 14), Color.white);
         var undoBtn = R(VW - 760, 8, 220, EditTopH - 16);
         var testBtn = R(VW - 530, 8, 210, EditTopH - 16);
         var menuBtn = R(VW - 310, 8, 290, EditTopH - 16);
@@ -961,7 +966,7 @@ public partial class GameManager
                 Fill(r, i == piece ? new Color(0.3f, 0.2f, 0.45f, 0.95f) : new Color(1f, 1f, 1f, 0.05f));
                 if (i == piece) Fill(R(x0 + k * (chipW + gap), by + 6f + row * 60f, chipW, 4f), new Color(1f, 0.9f, 0.5f));
                 Fill(R(x0 + k * (chipW + gap) + chipW / 2f - 12f, by + 14f + row * 60f, 24f, 16f), PieceColor(Pieces[i]));
-                Text(R(x0 + k * (chipW + gap), by + 32f + row * 60f, chipW, 26f), Pieces[i].Name, 13, i == piece ? Color.white : new Color(0.75f, 0.73f, 0.85f));
+                DrawChipName(R(x0 + k * (chipW + gap), by + 31f + row * 60f, chipW, 26f), Pieces[i].Name, 13, i == piece ? Color.white : new Color(0.75f, 0.73f, 0.85f));
             }
         }
         DrawBottomHelp("[W] [A] [S] [D]  [<] [^] [v] [>]  {ANALÓGICO} mover   •   [ESPAÇO] [ENTER] {A} pintar (segure)   •   [Q] [E]  [CTRL] [SHIFT]  {LB} {RB}  rodinha: peça   •   botão direito apaga");

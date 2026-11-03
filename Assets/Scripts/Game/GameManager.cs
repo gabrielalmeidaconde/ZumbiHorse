@@ -904,6 +904,53 @@ public partial class GameManager : MonoBehaviour
         return new Vector2(sp.x, Screen.height - sp.y);
     }
 
+    /// <summary>Maior fonte (até 'size') em que o texto cabe em 'maxW' (em unidades da interface, base 1080).</summary>
+    int FitSize(string s, int size, float maxW, int min = 9)
+    {
+        for (int f = size; f > min; f--)
+            if (TextWidth(s, f) <= maxW * S) return f;
+        return min;
+    }
+
+    /// <summary>Nome numa caixa estreita: diminui a letra e, se ainda ficar pequena demais, quebra em duas linhas.</summary>
+    void DrawChipName(Rect r, string name, int size, Color c)
+    {
+        float maxW = r.width / S - 6f;
+        int f = FitSize(name, size, maxW, 9);
+        int space = name.IndexOf(' ');
+        if (f >= size - 2 || space < 0) { Text(r, name, f, c); return; }
+        // quebra no espaço mais perto do meio
+        int best = space;
+        for (int i = space; i >= 0; i = name.IndexOf(' ', i + 1))
+            if (Mathf.Abs(i - name.Length / 2f) < Mathf.Abs(best - name.Length / 2f)) best = i;
+        string a = name.Substring(0, best), b = name.Substring(best + 1);
+        int f2 = Mathf.Min(FitSize(a, size - 1, maxW, 8), FitSize(b, size - 1, maxW, 8));
+        float lh = (f2 + 2) * S, cy = r.y + r.height / 2f;
+        Text(new Rect(r.x, cy - lh, r.width, lh), a, f2, c);
+        Text(new Rect(r.x, cy, r.width, lh), b, f2, c);
+    }
+
+    /// <summary>Etiquetas já desenhadas neste quadro (para não ficarem uma em cima da outra).</summary>
+    readonly List<Rect> placedTags = new List<Rect>();
+
+    /// <summary>Move a etiqueta para cima (ou para baixo) até não encostar nas já desenhadas, e a registra.</summary>
+    Rect StackTag(Rect r, bool up)
+    {
+        for (int guard = 0; guard < Players.Count + 1; guard++)
+        {
+            bool moved = false;
+            foreach (var o in placedTags)
+            {
+                if (!o.Overlaps(r)) continue;
+                r.y = up ? o.yMin - r.height : o.yMax;
+                moved = true;
+            }
+            if (!moved) break;
+        }
+        placedTags.Add(r);
+        return r;
+    }
+
     /// <summary>Texto centrado num ponto do mundo.</summary>
     void WorldText(Vector2 world, string s, int size, Color c)
     {
@@ -1366,9 +1413,15 @@ public partial class GameManager : MonoBehaviour
             }
             else
             {
+                // o espaço de cada item encolhe com a tela (em 4:3, ou com muitos itens): a letra diminui para caber,
+                // e a dica fica logo abaixo do nome, medida em pixels (antes era uma distância fixa no mundo e encavalava)
                 var def = ItemDefs.Get(it.Type);
-                WorldText(slot + new Vector2(0f, -1.5f), def.Name, 22, Color.white);
-                WorldText(slot + new Vector2(0f, -1.95f), def.Hint, 16, new Color(0.7f, 0.7f, 0.78f));
+                float maxW = Mathf.Abs(ToGui(new Vector2(BoxSpacing, 0f)).x - ToGui(Vector2.zero).x) / S - 16f;
+                int nf = FitSize(def.Name, 22, maxW, 12), hf = FitSize(def.Hint, 16, maxW, 10);
+                var g = ToGui(slot + new Vector2(0f, -1.5f));
+                float w = maxW * S, hy = g.y + (nf * 0.6f + hf * 0.6f + 2f) * S;
+                Text(new Rect(g.x - w / 2f, g.y - (nf + 10) * S / 2f, w, (nf + 10) * S), def.Name, nf, Color.white);
+                Text(new Rect(g.x - w / 2f, hy - (hf + 10) * S / 2f, w, (hf + 10) * S), def.Hint, hf, new Color(0.7f, 0.7f, 0.78f));
             }
         }
         if (nobodyLastRound && boxView.Any(it => it.Type == ItemType.Bomba))
@@ -1403,6 +1456,7 @@ public partial class GameManager : MonoBehaviour
 
     void DrawCursorTags(bool withItem)
     {
+        placedTags.Clear();
         foreach (var p in Players)
         {
             if (!p.CursorView.HasValue || (Phase == Phase.Pick && p.Picked) || (Phase == Phase.Place && p.Placed)) continue;
@@ -1416,8 +1470,10 @@ public partial class GameManager : MonoBehaviour
                 label = $"{p.Name} · {itemName}";
                 keys = $"{ConfirmKey(p.Input)} colocar" + (def.CanRotate ? $"   {RotateKey(p.Input)} girar" : "");
             }
-            Text(new Rect(g.x + 22 * S, g.y + 18 * S, 400 * S, 30 * S), label, 22, p.Color, TextAnchor.UpperLeft);
-            if (!p.IsBot) Keys(new Rect(g.x + 22 * S, g.y + 48 * S, 600 * S, 28 * S), keys, 15, new Color(1f, 0.9f, 0.55f), TextAnchor.MiddleLeft);
+            float lw = TextWidth(label, 22) + 8f * S, kw = p.IsBot ? 0f : LayoutKeys(keys, 15) + 8f * S;
+            var tag = StackTag(new Rect(g.x + 22 * S, g.y + 18 * S, Mathf.Max(lw, kw), (p.IsBot ? 30f : 60f) * S), false);
+            Text(new Rect(tag.x, tag.y, 400 * S, 30 * S), label, 22, p.Color, TextAnchor.UpperLeft);
+            if (!p.IsBot) Keys(new Rect(tag.x, tag.y + 30 * S, 600 * S, 28 * S), keys, 15, new Color(1f, 0.9f, 0.55f), TextAnchor.MiddleLeft);
         }
     }
 
@@ -1426,15 +1482,21 @@ public partial class GameManager : MonoBehaviour
     {
         float y = 1028f + Mathf.Clamp01(slide) * 52f;
         Fill(R(0, y, VW, 52), new Color(0.05f, 0.03f, 0.09f, 0.78f));
-        Keys(R(0, y, VW, 52), s, 20, new Color(0.88f, 0.86f, 0.95f));
+        // em tela estreita a letra diminui para a linha caber inteira
+        int size = 20;
+        while (size > 12 && LayoutKeys(s, size) > (VW - 40f) * S) size--;
+        Keys(R(0, y, VW, 52), s, size, new Color(0.88f, 0.86f, 0.95f));
     }
 
     void DrawRun()
     {
-        foreach (var p in Players)
+        placedTags.Clear();
+        foreach (var p in Players.Where(p => p.ZombieView == ZombieState.Alive).OrderBy(p => p.ZombiePos.y).ThenBy(p => p.Index))
         {
-            if (p.ZombieView != ZombieState.Alive) continue;
-            WorldText(p.ZombiePos + new Vector2(0f, 1.55f), p.Name, 20, p.Color);
+            var g = ToGui(p.ZombiePos + new Vector2(0f, 1.55f));
+            float w = TextWidth(p.Name, 20) + 6f * S, h = 24f * S;
+            var tag = StackTag(new Rect(g.x - w / 2f, g.y - h / 2f, w, h), true);
+            Text(tag, p.Name, 20, p.Color);
         }
         if (Phase == Phase.Run && PhaseTime < 1.1f)
         {
