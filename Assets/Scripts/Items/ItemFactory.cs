@@ -174,6 +174,48 @@ public static class ItemFactory
                 break;
             }
 
+            case ItemType.Caixote:
+            {
+                var body = PhysicsBody(root);
+                AddBox(body.gameObject, Vector2.zero, Vector2.one);
+                var vis = AddSprite(body.gameObject, Art.HeavyCrate, Vector2.zero, 5);
+                var crate = root.AddComponent<PushCrate>();
+                Setup(crate, item, body, vis, Vector2.one, Vector2.zero);
+                crate.Crush = CrushTrigger(body.gameObject, new Vector2(0f, -0.38f), new Vector2(0.8f, 0.3f));
+                break;
+            }
+
+            case ItemType.PlataformaFragil:
+            {
+                var body = PhysicsBody(root);
+                AddBox(body.gameObject, new Vector2(0f, 0.25f), new Vector2(3f, 0.5f));
+                var vis = AddSprite(body.gameObject, Art.FragilePlatform, new Vector2(0f, 0.25f), 5);
+                var plat = root.AddComponent<FallingPlatform>();
+                Setup(plat, item, body, vis, new Vector2(3f, 0.5f), new Vector2(0f, 0.25f));
+                plat.Crush = CrushTrigger(body.gameObject, new Vector2(0f, -0.05f), new Vector2(2.8f, 0.3f));
+                break;
+            }
+
+            case ItemType.Pedregulho:
+            {
+                var body = PhysicsBody(root);
+                var cc = body.gameObject.AddComponent<CircleCollider2D>();
+                cc.isTrigger = true;
+                cc.radius = Boulder.Radius;
+                body.gameObject.AddComponent<Hazard>();
+                var vis = AddSprite(body.gameObject, Art.Boulder, Vector2.zero, 6);
+                var b = root.AddComponent<Boulder>();
+                Setup(b, item, body, vis, new Vector2(0.84f, 0.84f), Vector2.zero);
+                // seta da direção, só enquanto o jogador posiciona
+                var arrow = AddSprite(root, Art.Arrow(3), Vector2.zero, 8);
+                arrow.gameObject.name = "Raio";
+                arrow.color = new Color(1f, 0.9f, 0.35f, 0.95f);
+                arrow.gameObject.SetActive(false);
+                b.Arrow = arrow;
+                b.SetDirection(0);
+                break;
+            }
+
             case ItemType.Ventilador:
             {
                 AddSprite(root, Art.FanBase, Vector2.zero, 6);
@@ -192,6 +234,36 @@ public static class ItemFactory
 
         item.CacheParts();
         return item;
+    }
+
+    /// <summary>Corpo cinemático dos blocos com física (ele se move; a raiz do item fica no lugar).</summary>
+    static Rigidbody2D PhysicsBody(GameObject root)
+    {
+        var rb = Child(root, "Corpo", Vector2.zero).AddComponent<Rigidbody2D>();
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        return rb;
+    }
+
+    static void Setup(PhysicsBlock block, ItemInstance item, Rigidbody2D body, SpriteRenderer vis, Vector2 size, Vector2 offset)
+    {
+        block.Item = item;
+        block.Body = body;
+        block.Size = size;
+        block.Offset = offset;
+        block.Visual = vis.transform;
+        block.VisualHome = vis.transform.localPosition;
+    }
+
+    /// <summary>Gatilho embaixo do bloco que arranca uma parte de quem estiver lá quando ele cai rápido (começa desligado).</summary>
+    static GameObject CrushTrigger(GameObject body, Vector2 localPos, Vector2 size)
+    {
+        var go = Child(body, "Esmagar", localPos);
+        var t = go.AddComponent<BoxCollider2D>();
+        t.isTrigger = true;
+        t.size = size;
+        go.AddComponent<Hazard>();
+        go.SetActive(false);
+        return go;
     }
 
     static GameObject Child(GameObject parent, string name, Vector2 localPos)

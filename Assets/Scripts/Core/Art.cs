@@ -202,6 +202,9 @@ public static class Art
             case "platform": return MovingPlatform;
             case "seesaw": return SeesawPlank;
             case "seesawbase": return SeesawBase;
+            case "heavycrate": return HeavyCrate;
+            case "fragileplat": return FragilePlatform;
+            case "boulder": return Boulder;
             case "zombie": return ZombieFrames(I(1), I(2), I(4))[Mathf.Clamp(I(3), 0, 7)];
             case "dance": return DanceFrame(I(1), I(2), I(3), I(4), I(5));
             case "zpart": return ZombiePart(I(1), I(2), I(3));
@@ -1691,6 +1694,71 @@ public static class Art
         c.Rect(77, 0, 3, 7, woodD);
         c.Disc(40f, 3.5f, 2.6f, metal);
         c.Set(40, 3, C(90, 90, 105));
+        return c.ToSpriteCentered();
+    });
+
+    /// <summary>Caixote (cai e dá para empurrar): madeira escura com cintas de ferro e setas de "empurre".</summary>
+    public static Sprite HeavyCrate => Cached("heavycrate", () =>
+    {
+        var c = new Canvas(16, 16);
+        Color32 dark = C(52, 34, 22), wood = C(120, 78, 44), woodL = C(148, 100, 58), woodD = C(92, 58, 32);
+        Color32 iron = C(96, 100, 112), ironL = C(150, 154, 166), ironD = C(58, 60, 70), paint = C(232, 196, 92);
+        c.Rect(0, 0, 16, 16, dark);
+        for (int y = 1; y < 15; y++)
+            for (int x = 1; x < 15; x++)
+                c.Set(x, y, x % 4 == 0 ? woodD : Hash(x, y, 71) < 0.08f ? woodL : wood);
+        // cintas de ferro em cima e embaixo, com rebites
+        c.Rect(1, 2, 14, 2, iron); c.Rect(1, 2, 14, 1, ironL);
+        c.Rect(1, 12, 14, 2, iron); c.Rect(1, 13, 14, 1, ironD);
+        foreach (int x in new[] { 3, 8, 12 }) { c.Set(x, 3, ironD); c.Set(x, 12, ironL); }
+        // setas pintadas: dá para empurrar para os dois lados
+        c.Rect(4, 7, 3, 1, paint); c.Set(4, 6, paint); c.Set(4, 8, paint); c.Set(3, 7, paint);
+        c.Rect(9, 7, 3, 1, paint); c.Set(11, 6, paint); c.Set(11, 8, paint); c.Set(12, 7, paint);
+        return c.ToSpriteCentered();
+    });
+
+    /// <summary>Plataforma frágil (3 x meia célula): laje de pedra rachada que despenca quando pisam.</summary>
+    public static Sprite FragilePlatform => Cached("fragileplat", () =>
+    {
+        var c = new Canvas(48, 8);
+        Color32 dark = C(58, 54, 66), stone = C(132, 124, 116), stoneL = C(164, 156, 146), stoneD = C(100, 94, 88), crack = C(36, 32, 40);
+        c.Rect(0, 0, 48, 8, dark);
+        for (int y = 1; y < 7; y++)
+            for (int x = 1; x < 47; x++)
+                c.Set(x, y, y == 1 ? stoneL : y == 6 ? stoneD : Hash(x, y, 91) < 0.1f ? stoneD : stone);
+        // rachaduras de cima a baixo
+        foreach (int x0 in new[] { 9, 23, 36 })
+        {
+            int x = x0;
+            for (int y = 1; y < 7; y++)
+            {
+                c.Set(x, y, crack);
+                x += Hash(x0, y, 5) < 0.5f ? 1 : -1;
+            }
+        }
+        // pedrinhas soltando embaixo
+        for (int x = 3; x < 46; x += 7) c.Set(x, 7, stoneD);
+        return c.ToSpriteCentered();
+    });
+
+    /// <summary>Pedregulho redondo com rachaduras (dá para ver ele girando).</summary>
+    public static Sprite Boulder => Cached("boulder", () =>
+    {
+        var c = new Canvas(16, 16);
+        Color32 rock = C(128, 112, 96), rockL = C(168, 150, 130), rockD = C(90, 78, 66);
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+            {
+                float dx = x + 0.5f - 8f, dy = y + 0.5f - 8f;
+                if (dx * dx + dy * dy >= 7.1f * 7.1f) continue;
+                float k = dx + dy;
+                c.Set(x, y, k < -4f ? rockL : k > 4.5f || Hash(x, y, 13) < 0.1f ? rockD : rock);
+            }
+        c.Line(5, 4, 8, 8, rockD);
+        c.Line(8, 8, 7, 12, rockD);
+        c.Line(8, 8, 12, 9, rockD);
+        c.Set(5, 5, rockL); c.Set(6, 4, rockL);
+        c.AddOutline(Outline);
         return c.ToSpriteCentered();
     });
 

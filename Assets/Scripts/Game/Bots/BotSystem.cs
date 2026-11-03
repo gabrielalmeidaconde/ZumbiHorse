@@ -26,6 +26,7 @@ public class BotSystem : MonoBehaviour
     readonly List<MovingSaw> saws = new List<MovingSaw>();
     readonly List<Train> trains = new List<Train>();
     readonly List<Flamethrower> flames = new List<Flamethrower>();
+    readonly List<Boulder> boulders = new List<Boulder>();
 
     void Update()
     {
@@ -62,10 +63,14 @@ public class BotSystem : MonoBehaviour
 
     void GatherDynamic()
     {
-        saws.Clear(); trains.Clear(); flames.Clear();
+        saws.Clear(); trains.Clear(); flames.Clear(); boulders.Clear();
         saws.AddRange(FindObjectsByType<MovingSaw>(FindObjectsSortMode.None));
         trains.AddRange(FindObjectsByType<Train>(FindObjectsSortMode.None));
-        foreach (var r in RunBehaviour.All) if (r is Flamethrower f) flames.Add(f);
+        foreach (var r in RunBehaviour.All)
+        {
+            if (r is Flamethrower f) flames.Add(f);
+            if (r is Boulder b) boulders.Add(b);
+        }
     }
 
     // ------------------------------------------------------------------ perigos dinâmicos
@@ -90,6 +95,8 @@ public class BotSystem : MonoBehaviour
         }
         foreach (var f in flames)
             if (f != null && f.PredictOn(ahead) && f.FlameRect.Overlaps(body)) return true;
+        foreach (var b in boulders)
+            if (b != null && CircleHitsRect(b.PredictWorld(ahead), Boulder.Radius + 0.1f, body)) return true;
         if (bones)
             foreach (var p in Projectile.All)
             {

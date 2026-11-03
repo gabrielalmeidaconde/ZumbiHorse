@@ -38,8 +38,9 @@ public class BotPlayer
 
     // a plataforma móvel não conta: os bots não sabem andar nela (o mapa deles ignora ela, como o trem)
     static bool IsBlock(ItemType t) => t == ItemType.Caixa || t == ItemType.Prancha || t == ItemType.Pedra || t == ItemType.Gelo || t == ItemType.CaixaPodre || t == ItemType.Esteira ||
-                                       t == ItemType.Gangorra;
-    static bool IsTrap(ItemType t) => t == ItemType.Espinhos || t == ItemType.Serra || t == ItemType.SerraMovel || t == ItemType.Canhao || t == ItemType.LancaChamas;
+                                       t == ItemType.Gangorra || t == ItemType.Caixote || t == ItemType.PlataformaFragil;
+    static bool IsTrap(ItemType t) => t == ItemType.Espinhos || t == ItemType.Serra || t == ItemType.SerraMovel || t == ItemType.Canhao || t == ItemType.LancaChamas ||
+                                      t == ItemType.Pedregulho;
 
     static Vector2Int SpawnNode(PlayerSlot p) => NavGrid.NodeAt(Level.SpawnPoint(p.Index));
 
@@ -327,6 +328,14 @@ public class BotPlayer
                         list.Add(new Plan { Pivot = node + new Vector2Int(-2, 0), Rotation = 0 });
                         list.Add(new Plan { Pivot = node + new Vector2Int(2, 0), Rotation = 2 });
                         list.Add(new Plan { Pivot = node + new Vector2Int(0, 2), Rotation = 3 });
+                        break;
+                    case ItemType.Pedregulho:
+                        // rola na direção do caminho, vindo de um pouco antes
+                        for (int d = 3; d <= 5; d++)
+                        {
+                            list.Add(new Plan { Pivot = node + new Vector2Int(-d, 0), Rotation = 0 });
+                            list.Add(new Plan { Pivot = node + new Vector2Int(d, 0), Rotation = 2 });
+                        }
                         break;
                     case ItemType.SerraMovel:
                         list.Add(new Plan { Pivot = node, Rotation = 0 });

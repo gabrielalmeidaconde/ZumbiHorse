@@ -332,7 +332,7 @@ public partial class GameManager
         if (turn != 0) SelectPiece(piece + turn);
         if (devices.Any(d => d.TurnDown) && CurrentPiece.IsItem && ItemDefs.Get(CurrentPiece.Item).CanRotate && pendingPortal == null)
         {
-            itemRot = (itemRot + 1) % 4;
+            itemRot = ItemDefs.NextRotation(ItemDefs.Get(CurrentPiece.Item), itemRot, 1);
             Sfx.Play("rotate");
         }
 

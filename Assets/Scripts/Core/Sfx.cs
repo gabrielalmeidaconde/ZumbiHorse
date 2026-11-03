@@ -28,6 +28,12 @@ public static class Sfx
         Add("shoot", 0.14f, t => (Square(Lerp(900, 250, t / 0.14f), t) * 0.4f + Noise() * 0.3f) * Env(t, 0.14f) * 0.4f);
         Add("death", 0.45f, t => (Saw(Lerp(220, 55, t / 0.45f), t) * 0.6f + Noise() * 0.3f) * Env(t, 0.45f) * 0.45f);
         Add("bomb", 0.8f, t => LowNoise(0.18f) * Env(t, 0.8f) * Env(t, 0.8f) * 0.9f + Sine(Lerp(70, 30, t / 0.8f), t) * Env(t, 0.5f) * 0.5f);
+        // blocos com física: caixote arrastando, baque no chão, plataforma rangendo, pedregulho rolando e batendo
+        Add("scrape", 0.12f, t => (LowNoise(0.5f) * 0.6f + Noise() * 0.2f) * Mathf.Sin(t / 0.12f * Mathf.PI) * 0.45f);
+        Add("thump", 0.22f, t => (Sine(Lerp(95, 45, t / 0.22f), t) * 0.8f + LowNoise(0.3f) * 0.5f * Env(t, 0.07f)) * Env(t, 0.22f) * 0.7f);
+        Add("creak", 0.5f, t => Saw(Lerp(180, 120, t / 0.5f) + 25 * Mathf.Sin(t * 40f), t) * (Mathf.Repeat(t * 14f, 1f) < 0.6f ? 1f : 0.3f) * Mathf.Clamp01(t * 20f) * Env(t, 0.5f) * 0.22f);
+        Add("roll", 0.3f, t => (LowNoise(0.08f) * 0.9f + Sine(55 + 8 * Mathf.Sin(t * 30f), t) * 0.3f) * Mathf.Sin(t / 0.3f * Mathf.PI) * 0.5f);
+        Add("bonk", 0.16f, t => (Sine(Lerp(160, 70, t / 0.16f), t) * 0.7f + Noise() * 0.3f * Env(t, 0.03f)) * Env(t, 0.16f) * 0.6f);
         Add("goal", 0.42f, t => Square(Arp(t, 0.09f, 523, 659, 784, 1047), t) * Env(t, 0.42f) * 0.25f);
         Add("tick", 0.04f, t => Square(1000, t) * Env(t, 0.04f) * 0.2f);
         Add("go", 0.3f, t => Square(t < 0.12f ? 784 : 1047, t) * Env(t, 0.3f) * 0.3f);
