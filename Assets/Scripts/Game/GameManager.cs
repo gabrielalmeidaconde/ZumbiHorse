@@ -1414,7 +1414,7 @@ public partial class GameManager : MonoBehaviour
             else
             {
                 // o espaço de cada item encolhe com a tela (em 4:3, ou com muitos itens): a letra diminui para caber,
-                // e a dica fica logo abaixo do nome, medida em pixels (antes era uma distância fixa no mundo e encavalava)
+                // e a dica fica logo abaixo do nome, medida em pixels para não encavalar nele
                 var def = ItemDefs.Get(it.Type);
                 float maxW = Mathf.Abs(ToGui(new Vector2(BoxSpacing, 0f)).x - ToGui(Vector2.zero).x) / S - 16f;
                 int nf = FitSize(def.Name, 22, maxW, 12), hf = FitSize(def.Hint, 16, maxW, 10);
