@@ -17,6 +17,14 @@ public class SawPathDef
     public float Speed = 2.5f;
 }
 
+/// <summary>Item do jogo que já vem colocado na fase (fases do criador). Portais vêm em pares seguidos.</summary>
+public class MapItemDef
+{
+    public ItemType Type;
+    public Vector2Int Pivot;
+    public int Rotation;
+}
+
 /// <summary>
 /// Mapa desenhado em texto: 27 linhas (de cima para baixo) x 48 colunas.
 ///   .  vazio          #  terra (a bomba destrói)   S  pedra (indestrutível)
@@ -32,6 +40,7 @@ public class MapDef
     public string[] Rows;
     public TrainDef[] Trains = new TrainDef[0];
     public SawPathDef[] Saws = new SawPathDef[0];
+    public MapItemDef[] Items = new MapItemDef[0];
 
     /// <summary>Caractere na célula (x, y), com y = 0 na linha de baixo.</summary>
     public char At(int x, int y)

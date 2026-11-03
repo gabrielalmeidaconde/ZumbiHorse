@@ -202,8 +202,9 @@ public static class Art
             case "platform": return MovingPlatform;
             case "seesaw": return SeesawPlank;
             case "seesawbase": return SeesawBase;
-            case "zombie": return ZombieFrames(I(1), I(2))[Mathf.Clamp(I(3), 0, 7)];
-            case "dance": return DanceFrame(I(1), I(2), I(3), I(4));
+            case "zombie": return ZombieFrames(I(1), I(2), I(4))[Mathf.Clamp(I(3), 0, 7)];
+            case "dance": return DanceFrame(I(1), I(2), I(3), I(4), I(5));
+            case "zpart": return ZombiePart(I(1), I(2), I(3));
             case "ground": return Ground(B(1), I(2));
             case "stone": return Stone(B(1));
             case "spring": return Spring(B(1));
@@ -1090,33 +1091,37 @@ public static class Art
     }
 
     /// <summary>Quadro da dança no tempo t (segundos desde que começou).</summary>
-    public static Sprite DanceSprite(int variant, int skin, int dance, float t)
+    public static Sprite DanceSprite(int variant, int skin, int dance, float t, int missing = 0)
     {
         var d = Dances[Mathf.Abs(dance) % Dances.Length];
-        return DanceFrame(variant, skin, dance, (int)(t * d.fps) % d.poses.Length);
+        return DanceFrame(variant, skin, dance, (int)(t * d.fps) % d.poses.Length, missing);
     }
 
-    static Sprite DanceFrame(int variant, int skin, int dance, int frame)
+    static Sprite DanceFrame(int variant, int skin, int dance, int frame, int missing)
     {
         variant = Mathf.Abs(variant) % PlayerColors.Length;
         skin = Mathf.Abs(skin) % Skins.Length;
         dance = Mathf.Abs(dance) % Dances.Length;
+        missing &= 31;
         var pose = Dances[dance].poses[Mathf.Clamp(frame, 0, Dances[dance].poses.Length - 1)];
-        return Cached($"dance_{variant}_{skin}_{dance}_{frame}", () => BuildZombie(variant, skin, pose.Legs, pose.Bob, pose));
+        string key = $"dance_{variant}_{skin}_{dance}_{frame}" + (missing != 0 ? "_" + missing : "");
+        return Cached(key, () => BuildZombie(variant, skin, pose.Legs, pose.Bob, pose, missing));
     }
 
-    /// <summary>Quadros do zumbi: 0-1 parado, 2-5 andando, 6 pulando, 7 caindo.</summary>
-    public static Sprite[] ZombieFrames(int variant, int skin)
+    /// <summary>Quadros do zumbi: 0-1 parado, 2-5 andando, 6 pulando, 7 caindo. 'missing' = partes arrancadas (bits de Limb).</summary>
+    public static Sprite[] ZombieFrames(int variant, int skin, int missing = 0)
     {
         variant = Mathf.Abs(variant) % PlayerColors.Length;
         skin = Mathf.Abs(skin) % Skins.Length;
+        missing &= 31;
+        string suffix = missing != 0 ? "_" + missing : "";
         // (pernas, deslocamento do tronco para baixo)
         var spec = new (int legs, int bob)[] { (0, 0), (0, 1), (1, 0), (2, 1), (3, 0), (2, 1), (4, 0), (1, 0) };
         var frames = new Sprite[spec.Length];
         for (int i = 0; i < spec.Length; i++)
         {
             int idx = i;
-            frames[i] = Cached($"zombie_{variant}_{skin}_{i}", () => BuildZombie(variant, skin, spec[idx].legs, spec[idx].bob));
+            frames[i] = Cached($"zombie_{variant}_{skin}_{i}{suffix}", () => BuildZombie(variant, skin, spec[idx].legs, spec[idx].bob, null, missing));
         }
         return frames;
     }
@@ -1160,38 +1165,111 @@ public static class Art
         }
     }
 
-    static Sprite BuildZombie(int variant, int skin, int legs, int bob, DancePose? dance = null)
+    static readonly Color32 Blood = C(150, 18, 24);
+
+    static Sprite BuildZombie(int variant, int skin, int legs, int bob, DancePose? dance = null, int missing = 0)
     {
         var look = Skins[skin];
         Color32? Pal(char ch) => ZombiePalette(look, variant, ch);
         Color32 sleeve = Pal(look.Sleeve) ?? Outline, hand = Pal(look.Hand) ?? Outline;
+        bool noBackArm = (missing & 1) != 0, noFrontArm = (missing & 2) != 0, noBackLeg = (missing & 4) != 0, noFrontLeg = (missing & 8) != 0;
+        bool noHead = (missing & 16) != 0;
+        string[] body = noHead ? Headless(look.Body) : look.Body;
 
         var c = new Canvas(18, 20);
         c.Map(ZombieLegs[legs], Pal, 0, 16);
+        // perna arrancada: some a coxa e o pé daquele lado (trás à esquerda, frente à direita), e fica o toco
+        for (int x = 0; x < c.W; x++)
+        {
+            if (!(x <= 7 ? noBackLeg : noFrontLeg)) continue;
+            if (c.Get(x, 17).a > 0) c.Set(x, 17, Blood);
+            c.Set(x, 18, Clear);
+            c.Set(x, 19, Clear);
+        }
         if (dance is DancePose d)
         {
             // braço de trás atrás do corpo, o da frente por cima; manga até o cotovelo e pele até a mão
-            void Arm(int sx, (int ex, int ey, int hx, int hy) a, Color32 sl, Color32 hd)
+            void Arm(int sx, (int ex, int ey, int hx, int hy) a, Color32 sl, Color32 hd, bool gone)
             {
+                if (gone) { c.Rect(sx + d.Dx, 11 + bob, 2, 2, Blood); return; }
                 c.Line(sx + d.Dx, 11 + bob, a.ex + d.Dx, a.ey + bob, sl);
                 c.Line(a.ex + d.Dx, a.ey + bob, a.hx + d.Dx, a.hy + bob, hd);
             }
-            Arm(3, d.Back, Shade(sleeve, 0.7f), Shade(hand, 0.75f));
-            c.Map(look.Body, Pal, d.Dx, bob);
-            Arm(11, d.Front, sleeve, hand);
+            Arm(3, d.Back, Shade(sleeve, 0.7f), Shade(hand, 0.75f), noBackArm);
+            c.Map(body, Pal, d.Dx, bob);
+            Arm(11, d.Front, sleeve, hand, noFrontArm);
+            if (noHead) c.Rect(6 + d.Dx, 10 + bob, 4, 1, Blood);
         }
         else
         {
             // braço esticado para a frente (a manga já está no tronco)
-            c.Map(look.Body, Pal, 0, bob);
-            c.Rect(13, 11 + bob, 3, 1, hand);
-            c.Rect(13, 12 + bob, 4, 1, hand);
+            c.Map(body, Pal, 0, bob);
+            if (noFrontArm) c.Rect(13, 11 + bob, 1, 2, Blood);
+            else
+            {
+                c.Rect(13, 11 + bob, 3, 1, hand);
+                c.Rect(13, 12 + bob, 4, 1, hand);
+            }
+            if (noHead) c.Rect(6, 10 + bob, 4, 1, Blood);
         }
         c.AddOutline(Outline);
         bool flip = dance.HasValue && dance.Value.Flip;
         if (flip) c.MirrorX();
-        // pivô no centro do corpo, na sola dos pés (1 px acima da borda inferior)
-        return c.ToSprite(new Vector2(flip ? 10.5f : 7.5f, 1f));
+        // pivô no centro do corpo, na sola dos pés (1 px acima da borda inferior); sem as pernas, no quadril
+        return c.ToSprite(new Vector2(flip ? 10.5f : 7.5f, noBackLeg && noFrontLeg ? 3f : 1f));
+    }
+
+    /// <summary>Pedaço do zumbi que voa quando ele perde uma parte: 0 braço, 1 perna, 2 cabeça, 3 tronco.</summary>
+    public static Sprite ZombiePart(int variant, int skin, int part)
+    {
+        variant = Mathf.Abs(variant) % PlayerColors.Length;
+        skin = Mathf.Abs(skin) % Skins.Length;
+        part = Mathf.Clamp(part, 0, 3);
+        return Cached($"zpart_{variant}_{skin}_{part}", () =>
+        {
+            var look = Skins[skin];
+            Color32? Pal(char ch) => ZombiePalette(look, variant, ch);
+            // a cabeça leva junto o que o visual tem em cima dela (chapéu, capacete, orelhas...)
+            var c = new Canvas(18, 14);
+            switch (part)
+            {
+                case 0:
+                    c.Line(2, 5, 6, 5, Pal(look.Sleeve) ?? Outline);
+                    c.Line(6, 5, 10, 6, Pal(look.Hand) ?? Outline);
+                    c.Rect(1, 5, 1, 2, Blood);
+                    break;
+                case 1:
+                    c.Rect(5, 2, 3, 6, Pal('P').Value);
+                    c.Rect(5, 8, 5, 2, Pal('F').Value);
+                    c.Rect(5, 1, 3, 1, Blood);
+                    break;
+                case 2:
+                    c.Map(Rows(look.Body, 0, 11), Pal, 0, 1);
+                    c.Rect(6, 12, 5, 1, Blood);
+                    break;
+                default:
+                    c.Map(Rows(look.Body, 11, 5), Pal, 0, 3);
+                    c.Rect(5, 2, 6, 1, Blood);
+                    break;
+            }
+            c.AddOutline(Outline);
+            return c.ToSpriteCentered();
+        });
+    }
+
+    /// <summary>O desenho sem a cabeça (as 11 linhas de cima ficam vazias).</summary>
+    static string[] Headless(string[] rows)
+    {
+        var copy = (string[])rows.Clone();
+        for (int i = 0; i <= 10; i++) copy[i] = "";
+        return copy;
+    }
+
+    static string[] Rows(string[] src, int from, int count)
+    {
+        var rows = new string[count];
+        Array.Copy(src, from, rows, 0, count);
+        return rows;
     }
 
     /// <summary>Mão/seta do cursor (branca, para ser tingida com a cor do jogador).</summary>

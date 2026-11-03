@@ -19,7 +19,8 @@ O jogo abre no **menu principal**: **Jogar** (lobby), **Jogar online**, **Criar 
 (no online, para sair da sala use o painel online).
 
 Na partida, **Esc**/**Start** abre o **menu de pausa**: **Continuar**, **Configurações**, **Controles** e
-**Sair da partida** (volta para o lobby; no desafio solo, **Sair do desafio** volta para o criador de fases).
+**Sair da partida** (volta para o lobby). No desafio solo, no lugar dele fica **Desistir** (termina a corrida como
+"não passou") e, depois da corrida, **Sair do desafio** (volta para o criador de fases).
 VOLTAR ou Esc/Start de novo continuam o jogo. No online quem mexe na pausa é o host (os outros veem o mesmo menu)
 e as configurações ficam só no menu principal, porque cada computador tem as suas.
 
@@ -89,24 +90,48 @@ Escolha **Criar fase** no menu principal ou, no lobby, aperte **C** (teclado), *
 **CRIAR FASE** (só no jogo offline).
 Dá para montar a fase com qualquer teclado, controle ou mouse:
 
-| Ação | Teclado | Controle | Mouse |
-|---|---|---|---|
-| Mover o cursor | WASD ou setas | Analógico / D-pad | Apontar |
-| Pintar (segure e ande para pintar vários) | Espaço / Enter | A | Botão esquerdo |
-| Trocar a peça | Q / E ou Ctrl / Shift direitos | LB / RB | Rodinha ou clicar na barra |
-| Apagar | peça "Apagar" | peça "Apagar" | Botão direito |
-| Menu (testar, copiar código, tema, sair) | Esc | Start | Botão MENU |
+| Ação | Teclado WASD | Teclado setas | Controle | Mouse |
+|---|---|---|---|---|
+| Mover o cursor | WASD | Setas | Analógico / D-pad | Apontar |
+| Pintar (segure e ande para pintar vários) | Espaço | Enter | A | Botão esquerdo |
+| Trocar a peça | Q / E | Ctrl / Shift direitos | LB / RB | Rodinha ou clicar na barra |
+| Girar o item | R | Delete | Y | |
+| Desfazer | Z | Backspace | B | Botão DESFAZER |
+| Testar na hora | T | T | Select | Botão TESTAR |
+| Apagar | peça "Apagar" | peça "Apagar" | peça "Apagar" | Botão direito |
+| Menu | Esc | Esc | Start | Botão MENU |
 
-- Peças: terra, pedra, gelo, trilho, ácido, espinhos, serra, serra móvel (marque o começo e o fim),
-  largada, cérebro, lápide e árvore. Trilho reto com 7 células ou mais ganha um trem sozinho.
-- São 6 fases salvas no computador, e cada mudança é salva na hora.
-- Para compartilhar, passe na fase em **TESTAR**: o seu melhor tempo vai junto no código. Depois use
-  **COPIAR CÓDIGO DO DESAFIO** e cole o código (começa com `ZH1-`) numa conversa. Qualquer mudança na fase pede
-  um teste novo.
-- O amigo copia o código e escolhe **COLAR CÓDIGO DE DESAFIO** no criador: é uma corrida solo contra o relógio
-  (morreu, volta para a largada e o tempo continua) para tentar bater o tempo de quem criou.
-- Na versão de navegador, copiar e colar abre uma caixinha do próprio navegador quando ele não deixa usar a
-  área de transferência direto.
+- Peças: terra, pedra, gelo, trilho, ácido, espinhos, serra, serra móvel (marque o começo e o fim), largadas 1 a 4,
+  cérebro, lápide e árvore, mais os itens do jogo (todos menos a bomba; o portal vai em par). Trilho reto com
+  7 células ou mais ganha um trem sozinho. Sem a largada 1 e o cérebro não dá para ficar: eles só mudam de lugar.
+- O menu do editor avisa quando os bots não acham caminho da largada até o cérebro (é só um aviso: eles não usam
+  todos os itens).
+- São 6 fases salvas no computador, em texto (o mesmo desenho do `MapDefs.cs`), e cada mudança é salva na hora.
+- Para compartilhar, passe na fase em **TESTAR**: o seu melhor tempo vai junto. Depois use **COPIAR CÓDIGO DO
+  DESAFIO** (código que começa com `ZH1-`, para colar numa conversa) ou **EXPORTAR ARQUIVO** (um `.txt` com a
+  fase). Qualquer mudança na fase pede um teste novo.
+- O amigo escolhe **COLAR CÓDIGO DE DESAFIO** ou **IMPORTAR ARQUIVO** no criador e a fase vai para as
+  **FASES RECEBIDAS**. De lá dá para jogar sozinho contra o relógio (morreu, volta para a largada e o tempo
+  continua; desistir pelo pause conta como "não passou"), levar para o lobby e jogar em grupo, copiar o código,
+  exportar ou apagar. O recorde de cada fase fica guardado.
+- As fases criadas e as recebidas aparecem no lobby junto com os mapas normais. No online, o host manda a fase
+  para os clientes.
+- Arquivos: no computador eles ficam em `Documentos/Ultimate Zumbi Horse/Fases` (importar lê todos os `.txt` dessa
+  pasta). No navegador, exportar baixa o arquivo e importar abre a janela para escolher o arquivo; copiar e colar
+  abre uma caixinha do próprio navegador quando ele não deixa usar a área de transferência direto.
+
+## Armadilhas: o zumbi perde as partes
+
+Zumbi não morre fácil: cada armadilha arranca **uma parte sorteada** entre as que sobram (braços, pernas e cabeça),
+então dá para perder a cabeça logo no primeiro golpe.
+
+- Sem uma perna o zumbi anda e pula menos; sem as duas ele se arrasta e quase não pula. Sem um braço o pulo na parede
+  fica mais fraco; sem os dois, não escala parede.
+- **Sem cabeça** o corpo continua, mas não enxerga: **esquerda e direita ficam trocadas** (a cabeça não volta).
+- Sem nenhuma parte para arrancar, o próximo golpe **mata**. **Ácido** e **cair para fora da fase** matam direto.
+  Na morte o zumbi se despedaça. Funciona com todos os visuais: a cabeça voa com o chapéu, o capacete ou a máscara.
+- Depois de perder uma parte ele é empurrado para longe da armadilha e fica 1 segundo piscando, sem levar dano.
+- O ponto de armadilha só vale quando ela **mata**; arrancar uma parte não dá ponto.
 
 ## Pontuação
 
@@ -316,15 +341,16 @@ Assets/
       Art.cs             pixel art procedural (zumbis e seus visuais, blocos, armadilhas, cenário)
       Sfx.cs             efeitos sonoros sintetizados
       FxParticle.cs      partículas, poeira, explosões
-      Clipboard.cs       copiar/colar (no navegador usa Plugins/WebGL/Clipboard.jslib)
+      Share.cs           copiar/colar e arquivos (no navegador usa Plugins/WebGL/Share.jslib)
       Spinner.cs         gira/balança/desliza objetos
     Game/
       GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
       GameManager.Net.cs modo cópia do cliente online, estado da interface pela rede, painel online
       GameManager.Menu.cs    menu principal, menu de pausa, configurações (salvas) e tela de controles
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
-      MapCode.cs         fases criadas: código de compartilhar, espaços salvos e trens automáticos
+      MapCode.cs         fases criadas: código e texto, salvas, recebidas, recordes, arquivos e trens automáticos
       GameManager.Editor.cs  criador de fases e desafio solo contra o relógio
+      GameManager.Test.cs    testes automáticos do criador e das partes (-zumbiCreatorTest, -zumbiLimbTest)
       Level.cs           monta a fase a partir do mapa, grade de ocupação, fundo
       Train.cs           trem fantasma (vai e volta, carona no teto, pontas mortais)
       Bots/              IA dos bots: NavGrid (mapa de navegação e simulação de pulos),
@@ -360,3 +386,10 @@ jogador de teste que aperta os botões sozinho). Para testar o online sem abrir 
 `-batchmode -nographics`; o log mostra o tráfego e quantos sprites o cliente está copiando.
 `-zumbiWin N` (pontos para vencer), `-zumbiMap N` (0 a 4 = mapa, 5 = aleatório),
 `-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots).
+
+`-zumbiLimbTest` leva um zumbi aos espinhos, a uma serra na altura da cabeça e ao ácido e confere as partes que
+ele perde, os controles trocados sem cabeça e quando morre. `-zumbiCreatorTest` testa o criador de fases sozinho (montar com itens, desfazer, aviso de caminho, testar, desistir,
+copiar, colar, exportar, importar, fases recebidas e partida em grupo com bots), escreve `[Teste] OK`/`[Teste] FALHOU`
+no log, tira prints com `-zumbiShots` e fecha. `-zumbiMapFile fase.txt` deixa uma fase criada escolhida no lobby
+(junto com `-zumbiDemo -zumbiHostIp`, testa o host mandando a fase para o cliente). Nos dois, as fases e os recordes
+ficam separados dos do jogador.

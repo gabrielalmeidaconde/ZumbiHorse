@@ -113,9 +113,10 @@ public partial class GameManager
                 // no online cada computador tem as suas configurações, e quem mexe na pausa é o host
                 AddItem(MenuAction.Settings, "CONFIGURAÇÕES", Online ? "só no jogo offline (ou no menu principal)" : null, enabled: !Online);
                 AddItem(MenuAction.Controls, "CONTROLES");
-                bool challenge = Phase == Phase.Challenge;
-                AddItem(MenuAction.Leave, challenge ? "SAIR DO DESAFIO" : "SAIR DA PARTIDA",
-                        challenge ? "volta para o criador de fases" : "volta para o lobby (a partida acaba para todos)");
+                if (Phase != Phase.Challenge)
+                    AddItem(MenuAction.Leave, "SAIR DA PARTIDA", "volta para o lobby (a partida acaba para todos)");
+                else if (challengeDone) AddItem(MenuAction.Leave, "SAIR DO DESAFIO", "volta para o criador de fases");
+                else AddItem(MenuAction.Leave, "DESISTIR", "termina a corrida sem tempo");
                 break;
 
             case MenuScreen.Settings:
@@ -245,7 +246,12 @@ public partial class GameManager
                 break;
             case MenuAction.Resume: SetPaused(false); Sfx.Play("tick"); break;
             case MenuAction.Leave:
-                if (Phase == Phase.Challenge) { SetPaused(false); ExitChallenge(); }
+                if (Phase == Phase.Challenge)
+                {
+                    SetPaused(false);
+                    if (challengeDone) ExitChallenge();
+                    else EndChallenge(false);
+                }
                 else BackToLobby();
                 transitionTime = Time.unscaledTime;
                 break;

@@ -90,8 +90,8 @@ public class ItemInstance : MonoBehaviour
         return true;
     }
 
-    /// <summary>Fixa o item na fase. Retorna false para a bomba (que explode e some).</summary>
-    public bool Place()
+    /// <summary>Fixa o item na fase. Retorna false para a bomba (que explode e some). Quieto = sem som e sem poeira.</summary>
+    public bool Place(bool quiet = false)
     {
         if (Def.Type == ItemType.Bomba)
         {
@@ -107,6 +107,7 @@ public class ItemInstance : MonoBehaviour
         g.Register();
         AllPlaced.Add(this);
         if (Level.Root != null) transform.SetParent(Level.Root, true);
+        if (quiet) return true;
         Sfx.PlayVar("place");
         Fx.Dust((Vector2)transform.position + RotatedCenter + Vector2.down * 0.5f, 6);
         return true;
