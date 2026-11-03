@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge }
+public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge, Menu }
 
 public class PlayerSlot
 {
@@ -20,6 +20,7 @@ public class PlayerSlot
     public bool IsBot => Bot != null;
     public int Kills;
     public int Dance = -1, LastDance = -1;   // dança no lobby/placar (-1 = parado)
+    public int Skin;                         // visual do zumbi (Art.SkinName), escolhido no lobby
     public bool Dancing => Dance >= 0;
     public readonly List<KeyValuePair<string, int>> RoundPoints = new List<KeyValuePair<string, int>>();
 
@@ -37,9 +38,9 @@ public class PlayerSlot
 
 /// <summary>
 /// Controla a partida no estilo Ultimate Chicken Horse:
-/// Lobby → Escolha de item → Posicionamento → Corrida até o cérebro → Placar → ... → Vitória.
+/// Menu → Lobby → Escolha de item → Posicionamento → Corrida até o cérebro → Placar → ... → Vitória.
 /// Toda a interface é desenhada com IMGUI (OnGUI) para o projeto não depender de prefabs.
-/// A parte do multiplayer online fica em GameManager.Net.cs.
+/// O multiplayer online fica em GameManager.Net.cs e os menus (principal, pausa, configurações) em GameManager.Menu.cs.
 /// </summary>
 public partial class GameManager : MonoBehaviour
 {
@@ -60,8 +61,10 @@ public partial class GameManager : MonoBehaviour
     public readonly List<PlayerSlot> Players = new List<PlayerSlot>();
     public IReadOnlyList<ItemInstance> BoxItems => boxItems;
 
-    /// <summary>Mapa escolhido no lobby; Maps.All.Length = aleatório.</summary>
+    /// <summary>Mapa escolhido no lobby (índice em lobbyMaps); lobbyMaps.Count = aleatório.</summary>
     public int MapIndex { get; private set; }
+    /// <summary>Mapas do lobby: os do jogo, depois as fases criadas e as recebidas.</summary>
+    readonly List<MapDef> lobbyMaps = new List<MapDef>();
     /// <summary>Só para testes: força os itens da caixa.</summary>
     public static List<ItemType> ForcedBox;
     /// <summary>Só para testes: deixa a partida começar só com bots.</summary>
@@ -116,7 +119,11 @@ public partial class GameManager : MonoBehaviour
         gameObject.AddComponent<BotSystem>();
         gameObject.AddComponent<NetGame>();
         Level.Build(Maps.All[0]);
+        LoadSettings();
+        RefreshLobbyMaps();
+        TryStartCreatorTest();
         DemoDriver.TryAttach(this);
+        if (!DemoDriver.Active && !MapCode.TestMode) OpenMainMenu(); // os modos de teste vão direto para o lobby/criador
     }
 
     void OnDestroy()
@@ -154,7 +161,7 @@ public partial class GameManager : MonoBehaviour
             y = -(EditBottomH - EditTopH) / 1080f * size;
         }
         cam.orthographicSize = size;
-        Vector2 off = shake > 0f ? Random.insideUnitCircle * shake : Vector2.zero;
+        Vector2 off = shake > 0f && shakeOn ? Random.insideUnitCircle * shake : Vector2.zero;
         cam.transform.position = new Vector3(off.x, y + off.y, -10f);
         shake = Mathf.MoveTowards(shake, 0f, Time.unscaledDeltaTime * 1.5f);
     }
@@ -180,6 +187,7 @@ public partial class GameManager : MonoBehaviour
             case Phase.Victory: UpdateVictory(); break;
             case Phase.Editor: UpdateCreator(); break;
             case Phase.Challenge: UpdateChallenge(); break;
+            case Phase.Menu: UpdateMenu(); break;
         }
         UpdateDances();
         floats.RemoveAll(f => Time.time - f.Start > f.Duration);
@@ -206,24 +214,13 @@ public partial class GameManager : MonoBehaviour
         doneTimer = -1f;
     }
 
-    /// <summary>Retorna true se o pause mudou neste quadro (para não repassar o mesmo botão).</summary>
+    /// <summary>Retorna true enquanto a pausa usa os botões (o menu de pausa está aberto ou acabou de abrir).</summary>
     bool HandlePause()
     {
-        if (Phase == Phase.Lobby || Phase == Phase.Editor) return false;
-        var devices = ActiveDevices();
-        bool toggle = devices.Any(d => d.PauseDown);
-        if (paused)
-        {
-            if (devices.Any(d => d.BackDown))
-            {
-                if (Phase == Phase.Challenge) { SetPaused(false); ExitChallenge(); }
-                else BackToLobby();
-                return true;
-            }
-            if (devices.Any(d => d.ConfirmDown)) toggle = true;
-        }
-        if (!toggle) return false;
-        SetPaused(!paused);
+        if (Phase == Phase.Lobby || Phase == Phase.Editor || Phase == Phase.Menu) return false;
+        if (paused) { UpdateMenu(); return true; }
+        if (!ActiveDevices().Any(d => d.PauseDown)) return false;
+        SetPaused(true);
         Sfx.Play("tick");
         return true;
     }
@@ -232,6 +229,7 @@ public partial class GameManager : MonoBehaviour
     {
         paused = on;
         Time.timeScale = paused ? 0f : 1f;
+        if (on) OpenMenuScreen(MenuScreen.Pause);
     }
 
     // ================================================================== lobby
@@ -241,7 +239,7 @@ public partial class GameManager : MonoBehaviour
         if (Players.Count >= MaxPlayers) return null;
         int index = 0;
         while (Players.Any(p => p.Index == index)) index++;
-        var slot = new PlayerSlot { Index = index, Input = input, JoinFrame = Time.frameCount };
+        var slot = new PlayerSlot { Index = index, Input = input, JoinFrame = Time.frameCount, Skin = input.Remote ? 0 : SavedSkin(index) };
         Players.Add(slot);
         Players.Sort((a, b) => a.Index.CompareTo(b.Index));
         Sfx.Play("join");
@@ -256,8 +254,28 @@ public partial class GameManager : MonoBehaviour
         if (slot == null) return null;
         slot.Bot = new BotPlayer(difficulty);
         slot.Ready = true;
+        slot.Skin = Random.Range(0, Art.SkinCount);
         return slot;
     }
+
+    static string SkinPrefKey(int index) => "visual_zumbi_" + index;
+
+    /// <summary>Visual que o jogador deste lugar escolheu da última vez (fica salvo no computador).</summary>
+    static int SavedSkin(int index) => Mathf.Clamp(PlayerPrefs.GetInt(SkinPrefKey(index), 0), 0, Art.SkinCount - 1);
+
+    void NextSkin(PlayerSlot p)
+    {
+        p.Skin = (p.Skin + 1) % Art.SkinCount;
+        if (!p.Input.Remote)
+        {
+            PlayerPrefs.SetInt(SkinPrefKey(p.Index), p.Skin);
+            PlayerPrefs.Save();
+        }
+        Sfx.Play("tick");
+    }
+
+    /// <summary>Visual de quem joga com este dispositivo (quem não entrou no lobby usa o do P1).</summary>
+    int SkinOf(InputSource d) => Players.FirstOrDefault(p => p.Input.SameDevice(d))?.Skin ?? SavedSkin(0);
 
     PlayerSlot LastBot => Players.Where(p => p.IsBot).OrderBy(p => p.JoinFrame).LastOrDefault();
 
@@ -267,6 +285,8 @@ public partial class GameManager : MonoBehaviour
         bool openCreator = creatorClicked || (InputSource.CreatorKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.SelectDown);
         creatorClicked = false;
         if (openCreator && CanCreate) { OpenCreator(); return; }
+        // ESC/START volta para o menu principal (no online, para sair da sala use o painel)
+        if (!Online && devices.Any(d => !d.Remote && d.PauseDown)) { BackToMenu(); return; }
         foreach (var d in devices)
         {
             if (!d.ConfirmDown || Players.Any(p => p.Input.SameDevice(d))) continue;
@@ -303,6 +323,7 @@ public partial class GameManager : MonoBehaviour
         {
             if (!p.Input.Connected) { Players.Remove(p); continue; }
             if (p.JoinFrame == Time.frameCount || !Listening(p.Input)) continue;
+            if (p.Input.SkinDown) NextSkin(p);
             if (p.Input.ConfirmDown && !p.Ready)
             {
                 p.Ready = true;
@@ -326,23 +347,46 @@ public partial class GameManager : MonoBehaviour
             if (Mathf.CeilToInt(lobbyCountdown) != before && lobbyCountdown > 0f) Sfx.Play("tick");
             if (lobbyCountdown <= 0f) StartMatch();
         }
-
-#if !UNITY_EDITOR && !UNITY_WEBGL
-        if (devices.Count > 0 && devices[0].Kind == DeviceKind.Keyboard1 && !devices[0].Remote && devices[0].PauseDown &&
-            NetGame.Instance.Mode == NetMode.Offline) Application.Quit();
-#endif
     }
 
     /// <summary>Escolhe o mapa (com volta) e mostra ele atrás do lobby.</summary>
     public void SetMap(int index)
     {
-        int n = Maps.All.Length + 1;
+        int n = lobbyMaps.Count + 1;
         MapIndex = ((index % n) + n) % n;
-        if (MapIndex < Maps.All.Length) Level.Build(Maps.All[MapIndex]);
+        if (MapIndex < lobbyMaps.Count) Level.Build(lobbyMaps[MapIndex]);
         Sfx.Play("tick");
     }
 
-    MapDef SelectedMap => MapIndex < Maps.All.Length ? Maps.All[MapIndex] : Level.Map;
+    MapDef SelectedMap => MapIndex < lobbyMaps.Count ? lobbyMaps[MapIndex] : Level.Map;
+
+    /// <summary>Remonta a lista de mapas do lobby e escolhe 'select' (ou mantém o escolhido, se ele ainda existe).</summary>
+    void RefreshLobbyMaps(MapDef select = null)
+    {
+        bool random = lobbyMaps.Count > 0 && MapIndex >= lobbyMaps.Count;
+        uint keep = select != null ? MapCode.Hash(select) : MapIndex < lobbyMaps.Count ? MapCode.Hash(lobbyMaps[MapIndex]) : 0;
+        lobbyMaps.Clear();
+        lobbyMaps.AddRange(Maps.All);
+        var seen = new HashSet<uint>(Maps.All.Select(MapCode.Hash));
+        for (int i = 0; i < MapCode.Slots; i++)
+        {
+            var m = MapCode.LoadSlot(i, out _);
+            if (m == null || !seen.Add(MapCode.Hash(m))) continue;
+            m.Description = "Fase criada por você";
+            lobbyMaps.Add(m);
+        }
+        foreach (var r in MapCode.LoadReceived())
+        {
+            if (!seen.Add(MapCode.Hash(r.Map))) continue;
+            r.Map.Description = "Fase recebida de um amigo";
+            lobbyMaps.Add(r.Map);
+        }
+        int found = lobbyMaps.FindIndex(m => MapCode.Hash(m) == keep);
+        MapIndex = select == null && random ? lobbyMaps.Count : Mathf.Max(0, found);
+    }
+
+    /// <summary>A fase atual, se ela não é um dos mapas do jogo (o host manda ela para os clientes).</summary>
+    public MapDef CustomMap => System.Array.IndexOf(Maps.All, Level.Map) < 0 ? Level.Map : null;
 
     void StartMatch()
     {
@@ -351,16 +395,18 @@ public partial class GameManager : MonoBehaviour
         nobodyLastRound = false;
         foreach (var p in Players) { p.Score = 0; p.PrevScore = 0; p.Ready = false; }
         ClearRoundObjects();
-        Level.Build(MapIndex < Maps.All.Length ? Maps.All[MapIndex] : Maps.All[Random.Range(0, Maps.All.Length)]);
+        Level.Build(MapIndex < lobbyMaps.Count ? lobbyMaps[MapIndex] : Maps.All[Random.Range(0, Maps.All.Length)]);
         Sfx.Play("go");
         BeginPick();
     }
 
-    public void BackToLobby()
+    /// <summary>Volta para o lobby; com 'select', já deixa aquela fase escolhida.</summary>
+    public void BackToLobby(MapDef select = null)
     {
         paused = false;
         Time.timeScale = 1f;
         ClearRoundObjects();
+        RefreshLobbyMaps(select);
         Level.Build(SelectedMap);
         foreach (var p in Players) { p.Ready = false; p.Score = 0; p.PrevScore = 0; }
         winner = -1;
@@ -672,7 +718,7 @@ public partial class GameManager : MonoBehaviour
         finishOrder.Clear();
         timeUp = botsOnly = false;
         runTimer = RunTime;
-        foreach (var p in Players) p.Zombie = Zombie.Spawn(p.Index, p.Input, Level.SpawnPoint(p.Index));
+        foreach (var p in Players) p.Zombie = Zombie.Spawn(p.Index, p.Skin, p.Input, Level.SpawnPoint(p.Index));
         RunActive = true;
         RunBehaviour.RunStarted();
         Sfx.Play("go");
@@ -717,6 +763,13 @@ public partial class GameManager : MonoBehaviour
             slot.Kills++;
             AddFloat(pos + Vector2.up * 0.7f, "armadilha de " + slot.Name, slot.Color, 20, 1.4f);
         }
+    }
+
+    /// <summary>Zumbi perdeu uma parte numa armadilha. Não dá ponto: o ponto de armadilha é só quando ela mata.</summary>
+    public void OnZombieHurt(Zombie z, Limb limb)
+    {
+        string what = limb == Limb.Head ? "A CABEÇA" : limb == Limb.BackArm || limb == Limb.FrontArm ? "O BRAÇO" : "A PERNA";
+        AddFloat(z.Position + Vector2.up * 1.4f, $"LÁ SE VAI {what}!", Art.PlayerColor(z.Index), 22, 1.1f);
     }
 
     /// <summary>Bot empacado (fase impossível para ele): desiste e o zumbi explode, para a rodada poder acabar.</summary>
@@ -884,6 +937,7 @@ public partial class GameManager : MonoBehaviour
             case Phase.Victory: DrawVictory(); break;
             case Phase.Editor: DrawCreator(); break;
             case Phase.Challenge: DrawChallenge(); break;
+            case Phase.Menu: DrawMainMenu(); break;
         }
 
         foreach (var f in floats)
@@ -894,8 +948,9 @@ public partial class GameManager : MonoBehaviour
             WorldText(f.Pos + Vector2.up * t * 1.2f, f.Text, f.Size, c);
         }
 
-        if (paused) DrawPause();
+        if (paused) DrawPauseMenu();
         DrawOnline();
+        DrawTransition();
     }
 
     // ------------------------------------------------------------------ teclas e botões desenhados
@@ -905,12 +960,13 @@ public partial class GameManager : MonoBehaviour
 
     static string ConfirmKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[ESPAÇO]" : i.Kind == DeviceKind.Keyboard2 ? "[ENTER]" : "{A}";
     static string BackKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q]" : i.Kind == DeviceKind.Keyboard2 ? "[BACKSPACE]" : "{B}";
+    static string SkinKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[R]" : i.Kind == DeviceKind.Keyboard2 ? "[CTRL]" : "{LB}";
     static string RotateKey(InputSource i) => i.Kind == DeviceKind.Keyboard1 ? "[Q] [E]" : i.Kind == DeviceKind.Keyboard2 ? "[CTRL] [SHIFT]" : "{LB} {RB}";
     const string AnyConfirm = "[ESPAÇO] [ENTER] {A}";
     const string AnyDance = "[F] [.] {X}";
 
     static readonly string[] DeviceTitles = { "TECLADO  ·  WASD", "TECLADO  ·  SETAS", "CONTROLE" };
-    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar" };
+    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar", "Trocar zumbi" };
     static readonly string[,] ControlKeys =
     {
         { "[W] [A] [S] [D]", "[<] [^] [v] [>]", "{ANALÓGICO} ou {D-PAD}" },
@@ -920,6 +976,7 @@ public partial class GameManager : MonoBehaviour
         { "[Q]", "[BACKSPACE]", "{B}" },
         { "[ESC]", "[ESC]", "{START}" },
         { "[F]", "[.]", "{X}" },
+        { "[R]", "[CTRL] direito", "{LB}" },
     };
 
     static readonly Color CapEdge = new Color(0.04f, 0.03f, 0.07f), CapFace = new Color(0.93f, 0.91f, 0.97f),
@@ -1110,7 +1167,7 @@ public partial class GameManager : MonoBehaviour
             {
                 Fill(R(x, y0, cw, 6), new Color(0.3f, 0.3f, 0.35f));
                 Text(R(tx, y0 + 10, tw, 34), $"JOGADOR {i + 1}", 24, new Color(0.5f, 0.5f, 0.55f), TextAnchor.MiddleLeft);
-                DrawSprite(sprite, Art.ZombieFrames(i)[0], new Color(0f, 0f, 0f, 0.5f));
+                DrawSprite(sprite, Art.ZombieFrames(i, 0)[0], new Color(0f, 0f, 0f, 0.5f));
                 Text(R(tx, y0 + 46, tw, 26), "Para entrar:", 16, new Color(0.8f, 0.8f, 0.85f), TextAnchor.MiddleLeft);
                 Keys(R(tx, y0 + 74, tw, 28), InputSource.GamepadsSupported ? "[ESPAÇO] [ENTER] {A}" : "[ESPAÇO] [ENTER]", 16, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleLeft);
                 Text(R(tx, y0 + 104, tw, 22), InputSource.GamepadsSupported ? "WASD, setas ou controle" : "WASD ou setas", 13, dim, TextAnchor.MiddleLeft);
@@ -1120,7 +1177,8 @@ public partial class GameManager : MonoBehaviour
 
             Fill(R(x, y0, cw, 6), pc);
             Text(R(tx, y0 + 10, tw, 34), $"JOGADOR {i + 1}", 24, pc, TextAnchor.MiddleLeft);
-            var frames = Art.ZombieFrames(i);
+            var frames = Art.ZombieFrames(i, slot.Skin);
+            Text(R(x + 4, y0 + 136, 110, 24), Art.SkinName(slot.Skin).ToUpper(), 15, new Color(0.85f, 0.82f, 0.92f));
 
             if (slot.IsBot)
             {
@@ -1135,7 +1193,7 @@ public partial class GameManager : MonoBehaviour
                 continue;
             }
 
-            if (slot.Dancing) DrawSprite(sprite, Art.DanceSprite(i, slot.Dance, Time.time), Color.white);
+            if (slot.Dancing) DrawSprite(sprite, Art.DanceSprite(i, slot.Skin, slot.Dance, Time.time), Color.white);
             else
             {
                 int f = slot.Ready ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
@@ -1144,16 +1202,14 @@ public partial class GameManager : MonoBehaviour
             }
             Text(R(tx, y0 + 46, tw, 26), DeviceLabel(slot), 17, new Color(0.85f, 0.85f, 0.9f), TextAnchor.MiddleLeft);
             if (slot.Ready)
-            {
-                Text(R(tx, y0 + 74, tw, 40), "PRONTO!", 32, new Color(0.5f, 1f, 0.45f), TextAnchor.MiddleLeft);
-                Keys(R(tx, y0 + 126, tw, 26), $"{BackKey(slot.Input)} cancelar", 14, dim, TextAnchor.MiddleLeft);
-            }
+                Text(R(tx, y0 + 66, tw, 40), "PRONTO!", 32, new Color(0.5f, 1f, 0.45f), TextAnchor.MiddleLeft);
             else
             {
                 float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 6f);
-                Keys(R(tx, y0 + 78, tw, 34), $"{ConfirmKey(slot.Input)} ficar pronto", 18, new Color(1f, 0.9f, 0.5f, blink), TextAnchor.MiddleLeft);
-                Keys(R(tx, y0 + 126, tw, 26), $"{BackKey(slot.Input)} sair", 14, dim, TextAnchor.MiddleLeft);
+                Keys(R(tx, y0 + 72, tw, 34), $"{ConfirmKey(slot.Input)} ficar pronto", 18, new Color(1f, 0.9f, 0.5f, blink), TextAnchor.MiddleLeft);
             }
+            Keys(R(tx, y0 + 104, tw, 24), $"{SkinKey(slot.Input)} trocar zumbi", 14, hint, TextAnchor.MiddleLeft);
+            Keys(R(tx, y0 + 128, tw, 26), $"{BackKey(slot.Input)} {(slot.Ready ? "cancelar" : "sair")}", 14, dim, TextAnchor.MiddleLeft);
         }
 
         string status;
@@ -1164,14 +1220,14 @@ public partial class GameManager : MonoBehaviour
         else status = "Esperando todo mundo ficar pronto...";
         Text(R(0, 636, VW, 48), status, 34, sc);
 
-        float th = DrawControls(688f);
-        float y = 688f + th + 4f;
-        float bw = Mathf.Min(VW - 60f, 1560f);
-        Fill(R((VW - bw) / 2f, y - 2f, bw, 90f), new Color(0.05f, 0.03f, 0.09f, 0.8f));
+        // rodapé com os bots, as regras e os atalhos (a tabela com todos os controles fica em CONTROLES, no menu)
+        float y = 966f, bw = Mathf.Min(VW - 60f, 1560f);
+        Fill(R((VW - bw) / 2f, y - 4f, bw, 100f), new Color(0.05f, 0.03f, 0.09f, 0.8f));
         Keys(R(0, y, VW, 32), "BOTS:  [W] [^] ou CIMA adiciona  •  [S] [v] ou BAIXO tira  •  [E] [SHIFT] {RB} muda a dificuldade do último", 17, hint);
         Text(R(0, y + 32, VW, 28), $"Primeiro a fazer {WinScore} pontos vence.  Chegar no cérebro: +{PointsGoal}  •  Primeiro: +{PointsFirst}  •  Matar com sua armadilha: +{PointsTrap}  •  Se todos chegarem, ninguém pontua!", 18, new Color(0.65f, 0.95f, 0.6f));
         string pads = InputSource.GamepadsSupported ? $"Controles conectados: {InputSource.GamepadCount}" : "Input System não ativo: só teclado";
-        Keys(R(0, y + 60, VW, 26), pads + "   •   [ESC] {START} pausar (na partida)   •   [O] jogar online   •   [C] {SELECT} criar fase", 15, new Color(0.6f, 0.6f, 0.66f));
+        string menu = Online ? "" : "   •   [ESC] {START} voltar ao menu";
+        Keys(R(0, y + 62, VW, 28), pads + menu + "   •   [O] jogar online   •   [C] {SELECT} criar fase", 15, new Color(0.6f, 0.6f, 0.66f));
     }
 
     void DrawMapSelector(float y)
@@ -1180,19 +1236,22 @@ public partial class GameManager : MonoBehaviour
         Fill(R(x, y, w, h), new Color(0.08f, 0.06f, 0.13f, 0.88f));
         Fill(R(x, y, w, 4), new Color(0.72f, 0.5f, 0.95f));
 
-        bool random = MapIndex >= Maps.All.Length;
+        // no cliente online a lista é a do host; a fase criada chega pela rede (replicaCustomMap)
+        int count = Replica ? replicaMapCount : lobbyMaps.Count;
+        bool random = MapIndex >= count;
+        MapDef map = random ? null : !Replica ? lobbyMaps[MapIndex] : MapIndex < Maps.All.Length ? Maps.All[MapIndex] : replicaCustomMap;
         float tx = x + 70f, ty = y + 12f, cell = 198f / Level.W; // miniatura sempre do mesmo tamanho
-        if (random)
+        if (map == null)
         {
             Fill(R(tx, ty, Level.W * cell, Level.H * cell), new Color(0.12f, 0.09f, 0.2f));
             Text(R(tx, ty, Level.W * cell, Level.H * cell), "?", 70, new Color(0.85f, 0.7f, 1f));
         }
-        else DrawMapThumbnail(Maps.All[MapIndex], tx, ty, cell);
+        else DrawMapThumbnail(map, tx, ty, cell);
 
-        string name = random ? "Aleatório" : Maps.All[MapIndex].Name;
-        string desc = random ? "Sorteia um dos mapas quando a partida começar." : Maps.All[MapIndex].Description;
+        string name = random ? "Aleatório" : map != null ? map.Name : "Recebendo a fase...";
+        string desc = random ? "Sorteia um dos mapas do jogo quando a partida começar." : map != null ? map.Description : "";
         float textX = tx + Level.W * cell + 30f;
-        Text(R(textX, y + 10, w - (textX - x) - 60, 50), $"MAPA {MapIndex + 1}/{Maps.All.Length + 1}:  {name}", 34, Color.white, TextAnchor.MiddleLeft);
+        Text(R(textX, y + 10, w - (textX - x) - 60, 50), $"MAPA {MapIndex + 1}/{count + 1}:  {name}", 34, Color.white, TextAnchor.MiddleLeft);
         Text(R(textX, y + 58, w - (textX - x) - 60, 32), desc, 21, new Color(0.85f, 0.82f, 0.92f), TextAnchor.MiddleLeft);
         Keys(R(textX, y + 88, w - (textX - x) - 60, 30), "[A] [D]  [<] [>]  ou analógico: trocar mapa", 16, new Color(1f, 0.9f, 0.5f), TextAnchor.MiddleLeft);
 
@@ -1255,6 +1314,9 @@ public partial class GameManager : MonoBehaviour
             float tx = Mathf.Lerp(t.FromX, t.ToX + 1 - len, t.StartT);
             Fill(R(x + tx * cell, y + (Level.H - 1 - (t.TrackRow + 1)) * cell, len * cell, cell), new Color(0.55f, 0.35f, 0.85f));
         }
+        foreach (var it in map.Items)
+            foreach (var c in MapCode.ItemCells(it))
+                Fill(R(x + c.x * cell, y + (Level.H - 1 - c.y) * cell, cell, cell), new Color(0.72f, 0.5f, 0.95f));
     }
 
     // ------------------------------------------------------------------ partida
@@ -1413,11 +1475,11 @@ public partial class GameManager : MonoBehaviour
         {
             var p = Players[i];
             float y = y0 + i * rowH;
-            var frames = Art.ZombieFrames(p.Index);
+            var frames = Art.ZombieFrames(p.Index, p.Skin);
             bool scored = p.Score > p.PrevScore;
             int fr = scored ? 2 + (int)(Time.time * 8f) % 4 : (int)(Time.time * 2f) % 2;
             var zr = R(barX - 130 - 90 * k, y - 10 * k, 90 * k, 100 * k);
-            if (p.Dancing) DrawSprite(zr, Art.DanceSprite(p.Index, p.Dance, Time.time), Color.white);
+            if (p.Dancing) DrawSprite(zr, Art.DanceSprite(p.Index, p.Skin, p.Dance, Time.time), Color.white);
             else DrawSprite(zr, frames[fr], Color.white);
             Text(R(barX - 120, y, 110, 80 * k), p.Name, Sz(40, 22), p.Color, TextAnchor.MiddleLeft);
             if (p.IsBot) Text(R(barX - 120, y + 52 * k, 110, 30 * k), "CPU " + p.Bot.Label, Sz(16, 12), p.Bot.LabelColor, TextAnchor.MiddleLeft);
@@ -1461,7 +1523,7 @@ public partial class GameManager : MonoBehaviour
         Text(R(0, 90 + wob, VW, 140), $"{w.FullName} VENCEU!", w.IsBot ? 96 : 120, w.Color);
         Text(R(0, 230, VW, 50), "O zumbi mais esperto do cemitério!", 32, new Color(0.9f, 0.85f, 1f));
 
-        var frames = Art.ZombieFrames(w.Index);
+        var frames = Art.ZombieFrames(w.Index, w.Skin);
         int f = 2 + (int)(Time.time * 9f) % 4;
         float hop = Mathf.Abs(Mathf.Sin(Time.time * 6f)) * 40f;
         DrawSprite(R(VW / 2 - 135, 330 - hop, 270, 300), frames[f], Color.white, (int)(Time.time * 1.5f) % 2 == 0);
@@ -1478,15 +1540,5 @@ public partial class GameManager : MonoBehaviour
             float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 5f);
             Keys(R(0, 960, VW, 50), $"{AnyConfirm}  voltar ao lobby", 28, new Color(1f, 0.9f, 0.5f, blink));
         }
-    }
-
-    void DrawPause()
-    {
-        Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0f, 0f, 0f, 0.72f));
-        Text(R(0, 110, VW, 110), "PAUSADO", 84, Color.white);
-        Keys(R(0, 228, VW, 46), $"[ESC] {{START}} ou {AnyConfirm}  continuar", 26, new Color(0.6f, 1f, 0.5f));
-        Keys(R(0, 280, VW, 46), Phase == Phase.Challenge ? "[Q] [BACKSPACE] {B}  sair do desafio" : "[Q] [BACKSPACE] {B}  sair para o lobby", 26, new Color(1f, 0.6f, 0.5f));
-        float h = DrawControls(350f);
-        Text(R(0, 350 + h + 20, VW, 36), "Dicas: segure o pulo para ir mais alto  •  encoste na parede e pule para escalar  •  o primeiro a chegar ganha +1", 21, new Color(0.78f, 0.76f, 0.86f));
     }
 }

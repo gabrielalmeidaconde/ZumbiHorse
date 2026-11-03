@@ -14,7 +14,7 @@ public enum NetMode { Offline, Connecting, Host, Client }
 public class NetGame : MonoBehaviour
 {
     /// <summary>Muda quando as mensagens mudam: host e cliente precisam da mesma versão.</summary>
-    public const int Protocol = 5;
+    public const int Protocol = 8;
     const float SendInterval = 1f / 30f;
     const float PingInterval = 0.5f;
     const float ConnectTimeout = 20f;
@@ -54,6 +54,9 @@ public class NetGame : MonoBehaviour
     readonly Dictionary<(int, int), InputSource> remote = new Dictionary<(int, int), InputSource>();
     readonly Dictionary<InputSource, byte[]> lastCounters = new Dictionary<InputSource, byte[]>();
     readonly List<byte[]> events = new List<byte[]>();   // sons e textos: vão junto com a próxima atualização
+    MapDef sentMap;                                      // fase criada que os clientes já receberam
+    bool mapSent;
+    byte[][] mapParts;                                   // pedaços da fase criada chegando no cliente
 
     // cliente
     SceneMirror mirror;
@@ -270,6 +273,7 @@ public class NetGame : MonoBehaviour
         sendTimer -= Time.unscaledDeltaTime;
         if (sendTimer > 0f || clients.Count == 0) return;
         sendTimer = SendInterval;
+        if (!mapSent || gm.CustomMap != sentMap) QueueMap(gm.CustomMap);
         TickSync();
         var ui = new MemoryStream();
         var w = new BinaryWriter(ui);
@@ -364,6 +368,7 @@ public class NetGame : MonoBehaviour
             sync.FullState(all);
             foreach (var b in Pack(all)) transport.Send(id, b, true);
             clients.Add(id);
+            mapSent = false;   // o novo cliente ainda não tem a fase criada
             Sfx.Play("join");
             Debug.Log($"[Net] cliente {id} entrou ({all.Count} mensagens de cena)");
         }
@@ -401,7 +406,7 @@ public class NetGame : MonoBehaviour
             int pad = r.ReadByte();
             float mx = r.ReadSByte() / 127f, my = r.ReadSByte() / 127f;
             bool jumpHeld = r.ReadByte() != 0;
-            var c = r.ReadBytes(7);
+            var c = r.ReadBytes(InputSource.ButtonCount);
 
             if (!remote.TryGetValue((conn, devId), out var src))
             {
@@ -444,6 +449,32 @@ public class NetGame : MonoBehaviour
         w.Write((byte)size);
         w.Write(duration);
         events.Add(ms.ToArray());
+    }
+
+    /// <summary>
+    /// Manda a fase criada (código de texto) pelo canal confiável, em pedaços que cabem numa mensagem.
+    /// Sem fase criada manda um pedaço vazio, e o cliente esquece a anterior.
+    /// </summary>
+    void QueueMap(MapDef map)
+    {
+        sentMap = map;
+        mapSent = true;
+        byte[] code = map != null ? System.Text.Encoding.UTF8.GetBytes(MapCode.Encode(map, 0)) : new byte[0];
+        const int Chunk = 900;
+        int parts = Mathf.Max(1, (code.Length + Chunk - 1) / Chunk);
+        if (DemoDriver.Active) Debug.Log($"[Net] mandando a fase {(map != null ? map.Name : "(nenhuma)")} em {parts} pedaço(s)");
+        for (int i = 0; i < parts; i++)
+        {
+            var ms = new MemoryStream();
+            var w = new BinaryWriter(ms);
+            int len = Mathf.Min(Chunk, code.Length - i * Chunk);
+            w.Write(Msg.MapData);
+            w.Write((byte)i);
+            w.Write((byte)parts);
+            w.Write((ushort)len);
+            w.Write(code, i * Chunk, len);
+            events.Add(ms.ToArray());
+        }
     }
 
     // ================================================================== cliente
@@ -496,6 +527,17 @@ public class NetGame : MonoBehaviour
                 float duration = r.ReadSingle();
                 gm.AddFloatFromNet(pos, text, color, size, duration);
                 break;
+            case Msg.MapData:
+                int part = r.ReadByte(), parts = r.ReadByte();
+                var bytes = r.ReadBytes(r.ReadUInt16());
+                if (mapParts == null || mapParts.Length != parts) mapParts = new byte[parts][];
+                if (part < parts) mapParts[part] = bytes;
+                if (Array.Exists(mapParts, x => x == null)) break;
+                var all = new MemoryStream();
+                foreach (var p in mapParts) all.Write(p, 0, p.Length);
+                mapParts = null;
+                gm.SetReplicaCustomMap(MapCode.TryParse(System.Text.Encoding.UTF8.GetString(all.ToArray()), out var map, out _) ? map : null);
+                break;
             case Msg.Ui:
                 if (Mode != NetMode.Client) break;
                 Computers = r.ReadByte();
@@ -520,7 +562,7 @@ public class NetGame : MonoBehaviour
             {
                 devId = d == TestDevice ? 99 : d.Kind == DeviceKind.Keyboard1 ? 0 : d.Kind == DeviceKind.Keyboard2 ? 1 : 2 + localIds.Count;
                 localIds[d] = devId;
-                counters[d] = new byte[7];
+                counters[d] = new byte[InputSource.ButtonCount];
             }
             var c = counters[d];
             bool test = d == TestDevice;
@@ -533,6 +575,7 @@ public class NetGame : MonoBehaviour
                 if (d.RotateCCWDown) c[InputSource.BtnCCW]++;
                 if (d.PauseDown) c[InputSource.BtnPause]++;
                 if (d.DanceDown) c[InputSource.BtnDance]++;
+                if (d.SkinDown) c[InputSource.BtnSkin]++;
             }
             Vector2 m = blocked && !test ? Vector2.zero : d.Move;
             w.Write((byte)devId);

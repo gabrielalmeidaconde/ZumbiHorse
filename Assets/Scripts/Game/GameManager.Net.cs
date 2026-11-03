@@ -20,6 +20,16 @@ public partial class GameManager
 
     bool replicaBotsOnly;
     int savedWinScore;
+    /// <summary>No cliente: quantos mapas o lobby do host tem e a fase criada que ele mandou (null = nenhuma).</summary>
+    int replicaMapCount;
+    MapDef replicaCustomMap;
+
+    public void SetReplicaCustomMap(MapDef map)
+    {
+        if (map != null) map.Description = "Fase criada no computador do host";
+        if (DemoDriver.Active) Debug.Log($"[Net] fase criada recebida do host: {(map != null ? $"{map.Name} ({map.Items.Length} itens)" : "nenhuma")}");
+        replicaCustomMap = map;
+    }
     bool BotsOnlyAllowed => Replica ? replicaBotsOnly : AllowBotsOnly;
 
     /// <summary>Com o painel online aberto, o teclado deste computador está digitando: só valem os dispositivos remotos.</summary>
@@ -60,6 +70,7 @@ public partial class GameManager
         paused = false;
         Time.timeScale = 1f;
         savedWinScore = WinScore;
+        replicaCustomMap = null;
         Replica = true;
         SetPhase(Phase.Lobby);
     }
@@ -75,7 +86,10 @@ public partial class GameManager
         winner = -1;
         lobbyCountdown = -1f;
         shake = 0f;
-        Level.Build(MapIndex < Maps.All.Length ? Maps.All[MapIndex] : Maps.All[0]);
+        // o número do mapa era o da lista do host
+        MapIndex = 0;
+        RefreshLobbyMaps();
+        Level.Build(Maps.All[0]);
         SetPhase(Phase.Lobby);
     }
 
@@ -131,12 +145,15 @@ public partial class GameManager
         w.Write(PhaseTime);
         w.Write((byte)Round);
         w.Write((byte)MapIndex);
-        w.Write((byte)System.Array.IndexOf(Maps.All, Level.Map));
+        w.Write((byte)lobbyMaps.Count);
+        w.Write((byte)System.Array.IndexOf(Maps.All, Level.Map));   // 255 = fase criada (chega pelo Msg.MapData)
         w.Write(lobbyCountdown);
         w.Write(pickTimer);
         w.Write(placeTimer);
         w.Write(runTimer);
         w.Write((byte)((paused ? 1 : 0) | (botsOnly ? 2 : 0) | (nobodyLastRound ? 4 : 0) | (AllowBotsOnly ? 8 : 0)));
+        w.Write((byte)menuScreen);   // menu de pausa: qual tela e qual item (quem mexe é o host)
+        w.Write((byte)menuSel);
         w.Write((byte)WinScore);
         w.Write(shake);
         w.Write(roundMessage ?? "");
@@ -156,6 +173,7 @@ public partial class GameManager
             w.Write((byte)(p.Input.Remote ? p.Input.RemoteConn : 0));
             w.Write((byte)((p.Ready ? 1 : 0) | (p.Picked ? 2 : 0) | (p.Placed ? 4 : 0) | (p.IsBot ? 8 : 0) | (p.HeldSecondPortal ? 16 : 0)));
             w.Write((sbyte)p.Dance);
+            w.Write((byte)p.Skin);
             w.Write((short)p.Score);
             w.Write((short)p.PrevScore);
             w.Write(p.JoinFrame);
@@ -178,8 +196,10 @@ public partial class GameManager
         Phase = phase;
         Round = r.ReadByte();
         MapIndex = r.ReadByte();
+        replicaMapCount = r.ReadByte();
         int levelMap = r.ReadByte();
         if (levelMap < Maps.All.Length && Level.Map != Maps.All[levelMap]) Level.LoadInfo(Maps.All[levelMap]);
+        else if (levelMap >= Maps.All.Length && replicaCustomMap != null && Level.Map != replicaCustomMap) Level.LoadInfo(replicaCustomMap);
         lobbyCountdown = r.ReadSingle();
         pickTimer = r.ReadSingle();
         placeTimer = r.ReadSingle();
@@ -189,6 +209,10 @@ public partial class GameManager
         botsOnly = (flags & 2) != 0;
         nobodyLastRound = (flags & 4) != 0;
         replicaBotsOnly = (flags & 8) != 0;
+        var screen = (MenuScreen)r.ReadByte();
+        if (screen != menuScreen) transitionTime = Time.unscaledTime;
+        menuScreen = screen;
+        menuSel = r.ReadByte();
         WinScore = r.ReadByte();
         shake = r.ReadSingle();
         roundMessage = r.ReadString();
@@ -215,6 +239,7 @@ public partial class GameManager
             p.Placed = (f & 4) != 0;
             p.HeldSecondPortal = (f & 16) != 0;
             p.Dance = r.ReadSByte();
+            p.Skin = r.ReadByte();
             p.Score = r.ReadInt16();
             p.PrevScore = r.ReadInt16();
             p.JoinFrame = r.ReadInt32();

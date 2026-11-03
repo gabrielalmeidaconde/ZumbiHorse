@@ -11,6 +11,31 @@ Cada rodada tem três fases:
 
 Os itens ficam na fase de uma rodada para a outra, então ela vai ficando cada vez mais difícil.
 
+## Menu principal, pausa e configurações
+
+O jogo abre no **menu principal**: **Jogar** (lobby), **Jogar online**, **Criar fase**, **Configurações**,
+**Controles** e **Sair** (o Sair não aparece no navegador). Qualquer teclado ou controle mexe no menu
+(cima/baixo escolhe, CONFIRMAR aperta, VOLTAR volta) e o mouse também. No lobby, **Esc**/**Start** volta para o menu
+(no online, para sair da sala use o painel online).
+
+Na partida, **Esc**/**Start** abre o **menu de pausa**: **Continuar**, **Configurações**, **Controles** e
+**Sair da partida** (volta para o lobby). No desafio solo, no lugar dele fica **Desistir** (termina a corrida como
+"não passou") e, depois da corrida, **Sair do desafio** (volta para o criador de fases).
+VOLTAR ou Esc/Start de novo continuam o jogo. No online quem mexe na pausa é o host (os outros veem o mesmo menu)
+e as configurações ficam só no menu principal, porque cada computador tem as suas.
+
+| Configuração | O que muda |
+|---|---|
+| Volume | De 0 (mudo) a 100%, de 10 em 10 |
+| Tela cheia | Tela cheia ou janela de 1280 x 720 (no navegador, use o botão de tela cheia da página) |
+| Resolução | As resoluções do monitor (na janela, o tamanho dela) |
+| Pontos para vencer | De 3 a 30 (padrão 10) |
+| Tremer a tela | Liga/desliga o tremor quando alguém morre ou algo explode |
+
+Esquerda/direita mudam o valor (CONFIRMAR ou clicar passa para o próximo). Tudo fica salvo no computador
+(`PlayerPrefs`; a tela cheia e a resolução o próprio Unity guarda). A tela **Controles** mostra a tabela com as
+teclas de cada tipo de dispositivo e os atalhos do lobby.
+
 ## Bots (jogadores do computador)
 
 No lobby, qualquer jogador controla os bots:
@@ -61,27 +86,52 @@ Não dá para colocar itens no trilho do trem (área marcada durante o posiciona
 
 ## Criador de fases e desafios
 
-No lobby, aperte **C** (teclado), **Select** (controle) ou clique em **CRIAR FASE** (só no jogo offline).
+Escolha **Criar fase** no menu principal ou, no lobby, aperte **C** (teclado), **Select** (controle) ou clique em
+**CRIAR FASE** (só no jogo offline).
 Dá para montar a fase com qualquer teclado, controle ou mouse:
 
-| Ação | Teclado | Controle | Mouse |
-|---|---|---|---|
-| Mover o cursor | WASD ou setas | Analógico / D-pad | Apontar |
-| Pintar (segure e ande para pintar vários) | Espaço / Enter | A | Botão esquerdo |
-| Trocar a peça | Q / E ou Ctrl / Shift direitos | LB / RB | Rodinha ou clicar na barra |
-| Apagar | peça "Apagar" | peça "Apagar" | Botão direito |
-| Menu (testar, copiar código, tema, sair) | Esc | Start | Botão MENU |
+| Ação | Teclado WASD | Teclado setas | Controle | Mouse |
+|---|---|---|---|---|
+| Mover o cursor | WASD | Setas | Analógico / D-pad | Apontar |
+| Pintar (segure e ande para pintar vários) | Espaço | Enter | A | Botão esquerdo |
+| Trocar a peça | Q / E | Ctrl / Shift direitos | LB / RB | Rodinha ou clicar na barra |
+| Girar o item | R | Delete | Y | |
+| Desfazer | Z | Backspace | B | Botão DESFAZER |
+| Testar na hora | T | T | Select | Botão TESTAR |
+| Apagar | peça "Apagar" | peça "Apagar" | peça "Apagar" | Botão direito |
+| Menu | Esc | Esc | Start | Botão MENU |
 
-- Peças: terra, pedra, gelo, trilho, ácido, espinhos, serra, serra móvel (marque o começo e o fim),
-  largada, cérebro, lápide e árvore. Trilho reto com 7 células ou mais ganha um trem sozinho.
-- São 6 fases salvas no computador, e cada mudança é salva na hora.
-- Para compartilhar, passe na fase em **TESTAR**: o seu melhor tempo vai junto no código. Depois use
-  **COPIAR CÓDIGO DO DESAFIO** e cole o código (começa com `ZH1-`) numa conversa. Qualquer mudança na fase pede
-  um teste novo.
-- O amigo copia o código e escolhe **COLAR CÓDIGO DE DESAFIO** no criador: é uma corrida solo contra o relógio
-  (morreu, volta para a largada e o tempo continua) para tentar bater o tempo de quem criou.
-- Na versão de navegador, copiar e colar abre uma caixinha do próprio navegador quando ele não deixa usar a
-  área de transferência direto.
+- Peças: terra, pedra, gelo, trilho, ácido, espinhos, serra, serra móvel (marque o começo e o fim), largadas 1 a 4,
+  cérebro, lápide e árvore, mais os itens do jogo (todos menos a bomba; o portal vai em par). Trilho reto com
+  7 células ou mais ganha um trem sozinho. Sem a largada 1 e o cérebro não dá para ficar: eles só mudam de lugar.
+- O menu do editor avisa quando os bots não acham caminho da largada até o cérebro (é só um aviso: eles não usam
+  todos os itens).
+- São 6 fases salvas no computador, em texto (o mesmo desenho do `MapDefs.cs`), e cada mudança é salva na hora.
+- Para compartilhar, passe na fase em **TESTAR**: o seu melhor tempo vai junto. Depois use **COPIAR CÓDIGO DO
+  DESAFIO** (código que começa com `ZH1-`, para colar numa conversa) ou **EXPORTAR ARQUIVO** (um `.txt` com a
+  fase). Qualquer mudança na fase pede um teste novo.
+- O amigo escolhe **COLAR CÓDIGO DE DESAFIO** ou **IMPORTAR ARQUIVO** no criador e a fase vai para as
+  **FASES RECEBIDAS**. De lá dá para jogar sozinho contra o relógio (morreu, volta para a largada e o tempo
+  continua; desistir pelo pause conta como "não passou"), levar para o lobby e jogar em grupo, copiar o código,
+  exportar ou apagar. O recorde de cada fase fica guardado.
+- As fases criadas e as recebidas aparecem no lobby junto com os mapas normais. No online, o host manda a fase
+  para os clientes.
+- Arquivos: no computador eles ficam em `Documentos/Ultimate Zumbi Horse/Fases` (importar lê todos os `.txt` dessa
+  pasta). No navegador, exportar baixa o arquivo e importar abre a janela para escolher o arquivo; copiar e colar
+  abre uma caixinha do próprio navegador quando ele não deixa usar a área de transferência direto.
+
+## Armadilhas: o zumbi perde as partes
+
+Zumbi não morre fácil: cada armadilha arranca **uma parte sorteada** entre as que sobram (braços, pernas e cabeça),
+então dá para perder a cabeça logo no primeiro golpe.
+
+- Sem uma perna o zumbi anda e pula menos; sem as duas ele se arrasta e quase não pula. Sem um braço o pulo na parede
+  fica mais fraco; sem os dois, não escala parede.
+- **Sem cabeça** o corpo continua, mas não enxerga: **esquerda e direita ficam trocadas** (a cabeça não volta).
+- Sem nenhuma parte para arrancar, o próximo golpe **mata**. **Ácido** e **cair para fora da fase** matam direto.
+  Na morte o zumbi se despedaça. Funciona com todos os visuais: a cabeça voa com o chapéu, o capacete ou a máscara.
+- Depois de perder uma parte ele é empurrado para longe da armadilha e fica 1 segundo piscando, sem levar dano.
+- O ponto de armadilha só vale quando ela **mata**; arrancar uma parte não dá ponto.
 
 ## Pontuação
 
@@ -136,20 +186,44 @@ A partida começa quando pelo menos 2 jogadores estão prontos. Funciona com qua
 | Voltar / sair do lobby | Q | Backspace | B |
 | Pausar | Esc | Esc | Start |
 | Dançar (de novo: sorteia outra dança) | F | . (do teclado numérico ou ao lado da vírgula) | X |
+| Trocar o visual do zumbi (no lobby) | R | Ctrl direito | LB |
 
-Com o jogo pausado: CONFIRMAR continua e VOLTAR sai para o lobby.
+Com o jogo pausado abre o menu de pausa (veja [Menu principal, pausa e configurações](#menu-principal-pausa-e-configurações)).
 O zumbi também desliza e pula na parede.
 Dá para dançar no lobby, no placar e na corrida (parado no chão). O zumbi dança sem parar até andar, pular ou morrer,
 e cada aperto sorteia outra dança das raças do World of Warcraft (26 no total: a masculina e a feminina de cada raça).
 Os bots às vezes comemoram dançando no placar quando chegam no cérebro.
 
-O lobby e a tela de pausa mostram uma tabela com os controles de cada tipo de dispositivo (a coluna de quem
-está jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
+No lobby, o cartão de cada jogador mostra os botões dele (ficar pronto, trocar o visual, sair). A tabela com os
+controles de cada tipo de dispositivo fica em **Controles**, no menu principal e na pausa (a coluna de quem está
+jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
 mostra os botões daquele jogador, e nas duas primeiras corridas aparece um lembrete de como pular.
+
+## Visuais dos zumbis
+
+No lobby, cada jogador troca o visual do seu zumbi com **R** (teclado WASD), **Ctrl direito** (teclado setas) ou
+**LB** (controle); o nome do visual aparece embaixo do zumbi. São 10 visuais, e todos guardam a cor do jogador em
+alguma parte para dar para saber quem é quem:
+
+| Visual | Como é | Onde fica a cor do jogador |
+|---|---|---|
+| Clássico | O zumbi de sempre: cabelo, camisa e calça | Camisa |
+| Esqueleto | Caveira, costelas e ossos | Cachecol e olhos brilhando |
+| Faraó | Múmia enfaixada com colar de ouro | Listras do toucado de faraó |
+| Pirata | Chapéu de três pontas com caveira e tapa-olho | Listras da camisa |
+| Astronauta | Capacete de vidro, traje branco e mochila | Painel do peito e cinto |
+| Vampiro | Cabelo lambido, presas e terno preto | Capa |
+| Palhaço | Careca com chapéu de festa e nariz vermelho | Cabelo e roupa de bolinhas |
+| Craque | Faixa na testa e calção branco | Camisa listrada de time |
+| Cavalo | Máscara de cavalo | Crina e camisa |
+| Punk | Brinco e jaqueta de couro com tachas | Moicano e camiseta |
+
+O visual escolhido fica salvo no computador para aquele lugar (P1, P2...). Os bots ganham um visual sorteado.
+No online, cada jogador troca o seu do mesmo jeito, no lobby do host.
 
 ## Multiplayer online
 
-Aperte **O** no lobby para abrir o painel **JOGAR ONLINE**:
+Escolha **Jogar online** no menu principal (ou aperte **O** no lobby) para abrir o painel **JOGAR ONLINE**:
 
 - **Criar sala**: o jogo gera um **código** (ex.: `K7QF2M`). Passe para os amigos.
 - **Entrar com código**: digite o código e aperte Enter. Funciona pela internet e também na versão do navegador (itch.io).
@@ -224,7 +298,7 @@ Não dá para colocar itens nas áreas de largada e de chegada (aparecem marcada
 ## Como abrir e jogar
 
 1. Abra a pasta `ZumbiHorse` pelo Unity Hub (Unity 6000.3.25f1).
-2. A cena `Assets/Scenes/Jogo.unity` abre sozinha na primeira vez. Aperte **Play**.
+2. A cena `Assets/Scenes/Jogo.unity` abre sozinha na primeira vez. Aperte **Play**: o jogo abre no menu principal.
    (O jogo também roda a partir de qualquer cena vazia: o `Bootstrap` cria o `GameManager`.)
 3. Para gerar executável: menu **Zumbi Horse > Build Linux**, **Build Windows** ou **Build WebGL (itch.io)**.
    Cada um precisa do módulo daquela plataforma instalado no Unity Hub (Installs > engrenagem > Add modules);
@@ -283,19 +357,21 @@ Assets/
     Bootstrap.cs         cria o GameManager se a cena não tiver um
     Core/
       GameInput.cs       InputSource: teclado WASD, teclado setas, controles (Input System)
-      Art.cs             pixel art procedural (zumbis, blocos, armadilhas, cenário)
+      Art.cs             pixel art procedural (zumbis e seus visuais, blocos, armadilhas, cenário)
       Sfx.cs             efeitos sonoros sintetizados
       Music.cs           música de fundo: escolhe a faixa pela fase, crossfade, volume próprio
       MusicSynth.cs      sintetizador chiptune e as partituras das músicas (em texto)
       FxParticle.cs      partículas, poeira, explosões
-      Clipboard.cs       copiar/colar (no navegador usa Plugins/WebGL/Clipboard.jslib)
+      Share.cs           copiar/colar e arquivos (no navegador usa Plugins/WebGL/Share.jslib)
       Spinner.cs         gira/balança/desliza objetos
     Game/
       GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
       GameManager.Net.cs modo cópia do cliente online, estado da interface pela rede, painel online
+      GameManager.Menu.cs    menu principal, menu de pausa, configurações (salvas) e tela de controles
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
-      MapCode.cs         fases criadas: código de compartilhar, espaços salvos e trens automáticos
+      MapCode.cs         fases criadas: código e texto, salvas, recebidas, recordes, arquivos e trens automáticos
       GameManager.Editor.cs  criador de fases e desafio solo contra o relógio
+      GameManager.Test.cs    testes automáticos do criador e das partes (-zumbiCreatorTest, -zumbiLimbTest)
       Level.cs           monta a fase a partir do mapa, grade de ocupação, fundo
       Train.cs           trem fantasma (vai e volta, carona no teto, pontas mortais)
       Bots/              IA dos bots: NavGrid (mapa de navegação e simulação de pulos),
@@ -331,3 +407,10 @@ jogador de teste que aperta os botões sozinho). Para testar o online sem abrir 
 `-batchmode -nographics`; o log mostra o tráfego e quantos sprites o cliente está copiando.
 `-zumbiWin N` (pontos para vencer), `-zumbiMap N` (0 a 4 = mapa, 5 = aleatório),
 `-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots).
+
+`-zumbiLimbTest` leva um zumbi aos espinhos, a uma serra na altura da cabeça e ao ácido e confere as partes que
+ele perde, os controles trocados sem cabeça e quando morre. `-zumbiCreatorTest` testa o criador de fases sozinho (montar com itens, desfazer, aviso de caminho, testar, desistir,
+copiar, colar, exportar, importar, fases recebidas e partida em grupo com bots), escreve `[Teste] OK`/`[Teste] FALHOU`
+no log, tira prints com `-zumbiShots` e fecha. `-zumbiMapFile fase.txt` deixa uma fase criada escolhida no lobby
+(junto com `-zumbiDemo -zumbiHostIp`, testa o host mandando a fase para o cliente). Nos dois, as fases e os recordes
+ficam separados dos do jogador.
