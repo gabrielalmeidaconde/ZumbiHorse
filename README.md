@@ -163,7 +163,8 @@ Cada parte da partida tem a sua música (chiptune sintetizada na hora, como os e
 | Vitória | Fanfarra em dó maior, depois do som de vitória |
 
 A troca de uma música para outra é com crossfade, e com o jogo pausado a música abaixa. A música toca num
-`AudioSource` separado dos efeitos e tem volume próprio (`Music.Level`, de 0 a 10, salvo em PlayerPrefs).
+`AudioSource` separado dos efeitos e tem volume próprio (**Música** nas configurações; `Music.Level`, de 0 a 10, salvo
+em PlayerPrefs). O **Volume** das configurações vale para tudo, efeitos e música.
 No online cada computador toca a música pela fase que recebe do host (ela não passa pela rede).
 No navegador o som só começa depois do primeiro clique ou tecla (regra dos navegadores), e a música começa do início nessa hora.
 

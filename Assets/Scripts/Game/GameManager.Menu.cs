@@ -10,7 +10,7 @@ using UnityEngine;
 public partial class GameManager
 {
     enum MenuScreen { Main, Pause, Settings, Controls }
-    enum MenuAction { Play, Online, Creator, Settings, Controls, Quit, Resume, Leave, Volume, Fullscreen, Resolution, WinPoints, ScreenShake, Back }
+    enum MenuAction { Play, Online, Creator, Settings, Controls, Quit, Resume, Leave, Volume, Music, Fullscreen, Resolution, WinPoints, ScreenShake, Back }
 
     struct MenuItem { public MenuAction Action; public string Label, Value, Detail; public bool Enabled; }
 
@@ -55,6 +55,9 @@ public partial class GameManager
                 volume = Step(volume, dir, 0, 10, wrap);
                 AudioListener.volume = volume / 10f;
                 PlayerPrefs.SetInt(PrefVolume, volume);
+                break;
+            case MenuAction.Music:
+                Music.Level = Step(Music.Level, dir, 0, 10, wrap);
                 break;
             case MenuAction.Fullscreen:
                 if (Screen.fullScreen) Screen.SetResolution(1280, 720, FullScreenMode.Windowed);
@@ -103,7 +106,7 @@ public partial class GameManager
                 AddItem(MenuAction.Play, "JOGAR", "De 2 a 8 jogadores neste computador, com bots se quiser");
                 AddItem(MenuAction.Online, "JOGAR ONLINE", "Crie uma sala ou entre com o código de um amigo");
                 AddItem(MenuAction.Creator, "CRIAR FASE", "Monte uma fase e desafie os amigos a bater o seu tempo");
-                AddItem(MenuAction.Settings, "CONFIGURAÇÕES", "Volume, tela e pontos para vencer");
+                AddItem(MenuAction.Settings, "CONFIGURAÇÕES", "Volume, música, tela e pontos para vencer");
                 AddItem(MenuAction.Controls, "CONTROLES", "As teclas de cada teclado e do controle");
                 if (CanQuit) AddItem(MenuAction.Quit, "SAIR");
                 break;
@@ -120,7 +123,8 @@ public partial class GameManager
                 break;
 
             case MenuScreen.Settings:
-                AddItem(MenuAction.Volume, "VOLUME", value: volume == 0 ? "MUDO" : $"{volume * 10}%");
+                AddItem(MenuAction.Volume, "VOLUME", "tudo: efeitos e música", volume == 0 ? "MUDO" : $"{volume * 10}%");
+                AddItem(MenuAction.Music, "MÚSICA", "só a música de fundo", Music.Level == 0 ? "MUDA" : $"{Music.Level * 10}%");
                 AddItem(MenuAction.Fullscreen, "TELA CHEIA", CanChangeVideo ? null : "no navegador, use o botão de tela cheia da página",
                         Screen.fullScreen ? "SIM" : "NÃO", CanChangeVideo);
                 AddItem(MenuAction.Resolution, "RESOLUÇÃO", CanChangeVideo ? (Screen.fullScreen ? "nitidez da imagem na tela cheia" : "tamanho da janela") : "só no jogo baixado",
