@@ -489,7 +489,7 @@ public partial class GameManager : MonoBehaviour
 
     static bool IsBuildingBlock(ItemType t) =>
         t == ItemType.Caixa || t == ItemType.Prancha || t == ItemType.Pedra || t == ItemType.Gelo || t == ItemType.CaixaPodre || t == ItemType.Esteira ||
-        t == ItemType.PlataformaMovel || t == ItemType.Gangorra;
+        t == ItemType.PlataformaMovel || t == ItemType.Gangorra || t == ItemType.Caixote || t == ItemType.PlataformaFragil;
 
     // Mais de 6 itens (5 jogadores ou mais): duas fileiras
     const float BoxRowGap = 4.6f;
@@ -635,7 +635,7 @@ public partial class GameManager : MonoBehaviour
                 int turn = (p.Input.RotateCCWDown ? 1 : 0) - (p.Input.RotateCWDown ? 1 : 0);
                 if (turn != 0)
                 {
-                    p.Item.Rotation = (p.Item.Rotation + turn + 4) % 4;
+                    p.Item.Rotation = ItemDefs.NextRotation(p.Item.Def, p.Item.Rotation, turn);
                     p.Item.ApplyRotation();
                     Sfx.Play("rotate");
                 }

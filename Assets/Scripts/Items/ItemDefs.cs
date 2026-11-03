@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum ItemType { Caixa, Prancha, Pedra, Espinhos, Serra, Canhao, Mola, Gelo, Bomba, SerraMovel, Portal, Esteira, LancaChamas, CaixaPodre, Ventilador, PlataformaMovel, Gangorra }
+public enum ItemType { Caixa, Prancha, Pedra, Espinhos, Serra, Canhao, Mola, Gelo, Bomba, SerraMovel, Portal, Esteira, LancaChamas, CaixaPodre, Ventilador, PlataformaMovel, Gangorra, Caixote, PlataformaFragil, Pedregulho }
 
 public class ItemDef
 {
@@ -14,6 +14,8 @@ public class ItemDef
     public Vector2 Center;
     public float Weight;
     public bool CanRotate = true;
+    /// <summary>Girar só espelha (rotação 0 ou 2): o pedregulho rola para a direita ou para a esquerda.</summary>
+    public bool MirrorOnly;
     /// <summary>O desenho não gira junto com a rotação (a plataforma móvel fica sempre na horizontal).</summary>
     public bool KeepUpright;
     /// <summary>Células por rotação, quando não é só girar as Cells (a plataforma móvel ocupa o trajeto).</summary>
@@ -41,6 +43,9 @@ public static class ItemDefs
         new ItemDef { Type = ItemType.Bomba, Name = "Bomba", Hint = "Explode blocos", Cells = new[] { V(0, 0) }, Weight = 1.5f, CanRotate = false },
         new ItemDef { Type = ItemType.PlataformaMovel, Name = "Plataforma Móvel", Hint = "Vai e volta", Cells = MovingPlatformCells(0), CellsFor = MovingPlatformCells, Center = new Vector2(1.5f, 0f), KeepUpright = true, Weight = 2f },
         new ItemDef { Type = ItemType.Gangorra, Name = "Gangorra", Hint = "Pesa e levanta", Cells = new[] { V(-2, 0), V(-1, 0), V(0, 0), V(1, 0), V(2, 0), V(0, -1) }, Center = new Vector2(0f, -0.5f), Weight = 1.5f, CanRotate = false },
+        new ItemDef { Type = ItemType.Caixote, Name = "Caixote", Hint = "Cai e dá para empurrar", Cells = new[] { V(0, 0) }, Weight = 2f, CanRotate = false },
+        new ItemDef { Type = ItemType.PlataformaFragil, Name = "Plataforma Frágil", Hint = "Despenca quando pisam", Cells = new[] { V(-1, 0), V(0, 0), V(1, 0) }, Weight = 1.5f, CanRotate = false },
+        new ItemDef { Type = ItemType.Pedregulho, Name = "Pedregulho", Hint = "Rola e machuca", Cells = new[] { V(0, 0) }, Weight = 1.5f, KeepUpright = true, MirrorOnly = true },
     };
 
     static Vector2Int V(int x, int y) => new Vector2Int(x, y);
@@ -67,6 +72,10 @@ public static class ItemDefs
             }
         return cells.ToArray();
     }
+
+    /// <summary>Próxima rotação ao girar 'turn' (+1 anti-horário, -1 horário).</summary>
+    public static int NextRotation(ItemDef def, int rotation, int turn) =>
+        def.MirrorOnly ? (rotation == 2 ? 0 : 2) : (rotation + turn + 4) % 4;
 
     public static ItemDef Get(ItemType t)
     {

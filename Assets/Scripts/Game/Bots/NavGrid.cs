@@ -82,8 +82,11 @@ public class NavGrid
 
             var b = c.bounds;
             var r = Rect.MinMaxRect(b.min.x, b.min.y, b.max.x, b.max.y);
+            var block = c.GetComponentInParent<PhysicsBlock>();
+            if (block != null && block.Gone) continue;
             if (!c.isTrigger)
             {
+                if (block != null) r = block.NavRect(r);                     // caixote: onde ele vai parar
                 var surf = c.GetComponent<Surface>();
                 AddRect(solids, solidBuckets, r);
                 solidIce.Add(surf != null && surf.Slippery);
@@ -93,7 +96,7 @@ public class NavGrid
             if (c.GetComponent<Goal>() != null) { goals.Add(r); continue; }
             if (c.GetComponent<Hazard>() != null)
             {
-                if (c.GetComponentInParent<MovingSaw>() != null) continue;   // dinâmico
+                if (c.GetComponentInParent<MovingSaw>() != null || c.GetComponentInParent<Boulder>() != null) continue;   // dinâmicos
                 AddRect(hazards, hazardBuckets, Grow(r, 0.05f));          // margem de segurança
                 continue;
             }

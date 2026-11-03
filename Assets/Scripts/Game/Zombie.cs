@@ -57,6 +57,7 @@ public class Zombie : MonoBehaviour
     float portalCooldown;
     bool faceRight = true;
     Vector3 squash = Vector3.one;
+    PushCrate wallCrate;        // caixote encostado (dá para empurrar)
 
     static PhysicsMaterial2D noFriction;
     static readonly List<Collider2D> hits = new List<Collider2D>();
@@ -176,7 +177,12 @@ public class Zombie : MonoBehaviour
         v.x = Mathf.MoveTowards(v.x - baseVx, target, accel * dt) + baseVx;
         // Encostado na parede, não empurra contra ela: senão a cápsula engancha nas emendas
         // entre blocos empilhados e perde a velocidade do pulo.
-        if (wallDir != 0 && v.x * wallDir > 0f) v.x = 0f;
+        if (wallDir != 0 && v.x * wallDir > 0f)
+        {
+            // empurrando um caixote (no chão): ele anda e o zumbi vai junto, mais devagar
+            if (grounded && wallCrate != null && wallCrate.TryPush(wallDir)) v.x = wallDir * PushCrate.PushSpeed;
+            else v.x = 0f;
+        }
 
         // ---- pulo
         if (jumpBufferTimer > 0f)
@@ -264,6 +270,12 @@ public class Zombie : MonoBehaviour
             if (seesaw != null && h.attachedRigidbody == seesaw.Plank) GroundSeesaw = seesaw;
             var crumble = h.GetComponent<Crumble>();
             if (crumble != null) crumble.Touch();
+            var block = h.GetComponentInParent<PhysicsBlock>();
+            if (block != null && h.attachedRigidbody == block.Body)
+            {
+                groundVelocity += new Vector2(block.Velocity.x, 0f);
+                block.Stood(this);
+            }
         }
 
         if (grounded && !wasGrounded)
@@ -277,6 +289,7 @@ public class Zombie : MonoBehaviour
     void CheckWalls()
     {
         wallDir = 0;
+        wallCrate = null;
         var filter = new ContactFilter2D { useTriggers = false };
         for (int side = -1; side <= 1; side += 2)
         {
@@ -286,6 +299,7 @@ public class Zombie : MonoBehaviour
             {
                 if (IsZombie(h)) continue;
                 wallDir = side;
+                wallCrate = h.GetComponentInParent<PushCrate>();
                 break;
             }
             if (wallDir != 0) break;

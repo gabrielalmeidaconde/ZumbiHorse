@@ -251,7 +251,7 @@ Observações:
 
 ## Itens
 
-Todos os itens giram (menos a bomba e a gangorra): o giro muda a direção da mola, do canhão, do lança-chamas,
+Todos os itens giram (menos a bomba, a gangorra, o caixote e a plataforma frágil; o pedregulho só espelha): o giro muda a direção da mola, do canhão, do lança-chamas,
 do ventilador, da esteira, da serra móvel e da plataforma móvel, e deixa a prancha ou os portais na vertical/horizontal.
 
 | Item | O que faz |
@@ -273,6 +273,14 @@ do ventilador, da esteira, da serra móvel e da plataforma móvel, e deixa a pra
 | Bomba | Explode tudo numa área 3x3 (não destrói pedra, trilhos e coisas do mapa) |
 | Plataforma Móvel | Plataforma de 3 que vai e volta 3 células e carrega quem está em cima. Fica sempre na horizontal; girar escolhe a direção (direita, cima, esquerda, baixo). Ocupa o trajeto inteiro |
 | Gangorra | Prancha de 5 sobre um apoio: o lado com mais peso desce e o outro sobe (quanto mais na ponta, mais peso). Dá para arremessar quem está do outro lado |
+| Caixote | Bloco 1x1 que cai quando não tem nada embaixo e anda quando um zumbi no chão empurra (dá para tapar buracos). Caindo rápido em cima de alguém, arranca uma parte |
+| Plataforma Frágil | Plataforma de 3 que treme quando alguém pisa e despenca meio segundo depois. Caindo rápido em cima de alguém, arranca uma parte |
+| Pedregulho | Rola para o lado escolhido (girar troca entre direita e esquerda), cai das beiradas e volta quando bate numa parede. Quem encostar perde uma parte; no ácido, afunda |
+
+Os blocos com física (caixote, plataforma frágil e pedregulho) se movem só durante a corrida e voltam para onde foram
+colocados antes de cada corrida, então no posicionamento (e para a bomba) eles estão sempre no lugar original. O
+movimento é calculado pelo próprio jogo (`Items/PhysicsBlock.cs`), sem depender do motor de física, para os bots
+conseguirem prever: eles tratam o caixote como chão onde ele vai parar e desviam do pedregulho como das serras móveis.
 
 Não dá para colocar itens nas áreas de largada e de chegada (aparecem marcadas no posicionamento).
 

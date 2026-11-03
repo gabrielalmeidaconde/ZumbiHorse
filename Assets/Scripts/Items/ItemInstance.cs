@@ -54,6 +54,8 @@ public class ItemInstance : MonoBehaviour
         transform.rotation = Def.KeepUpright ? Quaternion.identity : Quaternion.Euler(0, 0, Rotation * 90f);
         var mover = GetComponent<MovingBlock>();
         if (mover != null) mover.SetDirection(Rotation);
+        var boulder = GetComponent<Boulder>();
+        if (boulder != null) boulder.SetDirection(Rotation);
     }
 
     /// <summary>Posiciona livremente (sem grade) com o centro visual em p.</summary>
