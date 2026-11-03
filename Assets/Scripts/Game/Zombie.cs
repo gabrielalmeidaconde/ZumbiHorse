@@ -31,6 +31,7 @@ public class Zombie : MonoBehaviour
     static readonly float[] LegSpeed = { 0.45f, 0.8f, 1f }, LegJump = { 0.55f, 0.82f, 1f }, ArmWallJump = { 0f, 0.85f, 1f };
 
     public int Index;
+    public int Skin;   // visual escolhido no lobby (Art.SkinName)
     public InputSource Controls;
     public ZombieState State = ZombieState.Alive;
     public bool ControlsEnabled = true;
@@ -75,14 +76,15 @@ public class Zombie : MonoBehaviour
     int Legs => ((Missing & Limb.BackLeg) == 0 ? 1 : 0) + ((Missing & Limb.FrontLeg) == 0 ? 1 : 0);
     int Arms => ((Missing & Limb.BackArm) == 0 ? 1 : 0) + ((Missing & Limb.FrontArm) == 0 ? 1 : 0);
 
-    public static Zombie Spawn(int index, InputSource controls, Vector2 pos)
+    public static Zombie Spawn(int index, int skin, InputSource controls, Vector2 pos)
     {
         var go = new GameObject($"Zumbi P{index + 1}");
         go.transform.position = pos;
         var z = go.AddComponent<Zombie>();
         z.Index = index;
+        z.Skin = skin;
         z.Controls = controls;
-        z.frames = Art.ZombieFrames(index);
+        z.frames = Art.ZombieFrames(index, skin);
         z.Build();
         foreach (var other in All)
             if (other != null && other != z) Physics2D.IgnoreCollision(z.body, other.body, true);
@@ -372,7 +374,7 @@ public class Zombie : MonoBehaviour
     void LoseLimb(Limb limb, Vector2 from)
     {
         Missing |= limb;
-        frames = Art.ZombieFrames(Index, (int)Missing);
+        frames = Art.ZombieFrames(Index, Skin, (int)Missing);
         hurtTimer = HurtInvulnerable;
         dance = -1;
 
@@ -396,7 +398,7 @@ public class Zombie : MonoBehaviour
     /// <summary>Pedaço do zumbi voando (0 braço, 1 perna, 2 cabeça, 3 tronco) para o lado 'side'.</summary>
     void Fling(int part, Vector2 at, float side)
     {
-        var piece = Fx.Spawn(Art.ZombiePart(Index, part), at, Color.white, 1f, 15);
+        var piece = Fx.Spawn(Art.ZombiePart(Index, Skin, part), at, Color.white, 1f, 15);
         piece.GetComponent<SpriteRenderer>().flipX = side < 0f;
         piece.Velocity = new Vector2(side * Random.Range(1.5f, 4f), Random.Range(8f, 12f));
         piece.Gravity = 30f;
@@ -463,7 +465,7 @@ public class Zombie : MonoBehaviour
         if (dance >= 0)
         {
             danceTime += dt;
-            sr.sprite = Art.DanceSprite(Index, dance, danceTime, (int)Missing);
+            sr.sprite = Art.DanceSprite(Index, Skin, dance, danceTime, (int)Missing);
             sr.flipX = !faceRight;
             squash = Vector3.Lerp(squash, Vector3.one, dt * 12f);
             visual.localScale = squash;

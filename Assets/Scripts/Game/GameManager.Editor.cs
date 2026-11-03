@@ -49,6 +49,7 @@ public partial class GameManager
     int creatorSel;
     int clickedItem = -1;        // item clicado com o mouse no OnGUI, tratado no Update seguinte
     bool creatorClicked, mouseMoved;
+    bool creatorFromMenu;        // aberto pelo menu principal: sair volta para ele (senão, para o lobby)
     Vector2 lastMouse;
     readonly MapDef[] slotMaps = new MapDef[MapCode.Slots];
     readonly int[] slotTimes = new int[MapCode.Slots];
@@ -108,6 +109,7 @@ public partial class GameManager
 
     void OpenCreator()
     {
+        creatorFromMenu = Phase == Phase.Menu;
         lobbyCountdown = -1f;
         LoadSlots();
         creatorScreen = CreatorScreen.Slots;
@@ -166,16 +168,22 @@ public partial class GameManager
     void UpdateSlots()
     {
         bool confirm = ListInput(SlotsItems, out bool back, out _);
-        if (back) { BackToLobby(); Sfx.Play("tick"); return; }
+        if (back) { LeaveCreator(); return; }
         if (!confirm) return;
         switch (creatorSel - MapCode.Slots)
         {
             case 0: OpenReceived(0); break;
             case 1: PasteMap(); break;
             case 2: ImportFile(); break;
-            case 3: BackToLobby(); break;
+            case 3: LeaveCreator(); break;
             default: OpenSlot(creatorSel); break;
         }
+    }
+
+    void LeaveCreator()
+    {
+        if (creatorFromMenu) BackToMenu();
+        else { BackToLobby(); Sfx.Play("tick"); }
     }
 
     void OpenSlot(int slot)
@@ -662,7 +670,7 @@ public partial class GameManager
         respawnTimer = -1f;
         challengeRecordMs = MapCode.Record(challengeMap);
         if (challengeInput == null || !challengeInput.Connected || challengeInput.Remote) challengeInput = ActiveDevices().First(d => !d.Remote);
-        challengeZombie = Zombie.Spawn(0, challengeInput, Level.SpawnPoint(0));
+        challengeZombie = Zombie.Spawn(0, SkinOf(challengeInput), challengeInput, Level.SpawnPoint(0));
         RunActive = true;
         RunBehaviour.RunStarted();
         SetPhase(Phase.Challenge);
@@ -697,7 +705,7 @@ public partial class GameManager
                 Projectile.ClearAll();
                 RunBehaviour.RunEnded();
                 RunBehaviour.RunStarted();
-                challengeZombie = Zombie.Spawn(0, challengeInput, Level.SpawnPoint(0));
+                challengeZombie = Zombie.Spawn(0, SkinOf(challengeInput), challengeInput, Level.SpawnPoint(0));
             }
         }
         else if (challengeZombie.State == ZombieState.Finished) EndChallenge(true);
@@ -822,7 +830,7 @@ public partial class GameManager
         DrawListItem(y, 52f, MapCode.Slots, $"FASES RECEBIDAS ({received.Count})", null);
         DrawListItem(y += 58f, 52f, MapCode.Slots + 1, "COLAR CÓDIGO DE DESAFIO", null);
         DrawListItem(y += 58f, 52f, MapCode.Slots + 2, Share.Browser ? "IMPORTAR ARQUIVO" : "IMPORTAR ARQUIVOS DA PASTA", null);
-        DrawListItem(y += 58f, 52f, MapCode.Slots + 3, "VOLTAR AO LOBBY", null);
+        DrawListItem(y += 58f, 52f, MapCode.Slots + 3, creatorFromMenu ? "VOLTAR AO MENU" : "VOLTAR AO LOBBY", null);
         DrawBottomHelp(ListHelp);
     }
 
@@ -876,7 +884,7 @@ public partial class GameManager
                 if (ch < '1' || ch > '4') continue;
                 // zumbi fantasma na largada (sprite de 18x20 px, 16 px por célula, pés no chão da célula)
                 var r = new Rect(a.x + (x + 0.5f - 7.5f / 16f) * cw, a.y - (y + 19f / 16f) * chh, cw * 18f / 16f, chh * 20f / 16f);
-                DrawSprite(r, Art.ZombieFrames(ch - '1')[0], new Color(1f, 1f, 1f, 0.75f));
+                DrawSprite(r, Art.ZombieFrames(ch - '1', 0)[0], new Color(1f, 1f, 1f, 0.75f));
                 WorldText(Level.CellCenter(new Vector2Int(x, y)) + Vector2.up * 1.3f, "P" + ch, 16, Art.PlayerColor(ch - '1'));
             }
 

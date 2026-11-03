@@ -29,9 +29,10 @@ public class InputSource
     public bool RemoteAlive = true;
     public Vector2 RemoteMove;
     public bool RemoteJumpHeld;
-    /// <summary>Quadro em que cada botão foi apertado lá: pulo, confirmar, voltar, girar horário, anti-horário, pausar, dançar.</summary>
-    public readonly int[] RemotePressFrame = { -1, -1, -1, -1, -1, -1, -1 };
-    public const int BtnJump = 0, BtnConfirm = 1, BtnBack = 2, BtnCW = 3, BtnCCW = 4, BtnPause = 5, BtnDance = 6;
+    /// <summary>Quadro em que cada botão foi apertado lá: pulo, confirmar, voltar, girar horário, anti-horário, pausar, dançar, visual.</summary>
+    public readonly int[] RemotePressFrame = { -1, -1, -1, -1, -1, -1, -1, -1 };
+    public const int BtnJump = 0, BtnConfirm = 1, BtnBack = 2, BtnCW = 3, BtnCCW = 4, BtnPause = 5, BtnDance = 6, BtnSkin = 7;
+    public const int ButtonCount = 8;
 
     bool RemoteDown(int b) => RemotePressFrame[b] == Time.frameCount;
 
@@ -327,6 +328,22 @@ public class InputSource
                 case DeviceKind.Keyboard1: return Down(K.F);
                 case DeviceKind.Keyboard2: return Down(K.Period) || Down(K.NumPeriod);
                 case DeviceKind.Gamepad: return PadDown(2);
+                default: return false;
+            }
+        }
+    }
+
+    /// <summary>Trocar o visual do zumbi (no lobby).</summary>
+    public bool SkinDown
+    {
+        get
+        {
+            if (Remote) return RemoteDown(BtnSkin);
+            switch (Kind)
+            {
+                case DeviceKind.Keyboard1: return Down(K.R);
+                case DeviceKind.Keyboard2: return Down(K.RightCtrl);
+                case DeviceKind.Gamepad: return PadDown(4);
                 default: return false;
             }
         }
