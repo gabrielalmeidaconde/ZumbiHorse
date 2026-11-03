@@ -349,11 +349,13 @@ public class NetGame : MonoBehaviour
             int protocol = data.Length >= 5 ? r.ReadInt32() : -1;
             if (protocol != Protocol)
             {
-                var ms = new MemoryStream();
-                var w = new BinaryWriter(ms);
-                w.Write(Msg.Reject);
-                w.Write("Versões diferentes do jogo: atualize o jogo nos dois computadores.");
-                transport.Send(id, ms.ToArray(), true);
+                Reject(id, "Versões diferentes do jogo: atualize o jogo nos dois computadores.");
+                return;
+            }
+            if (clients.Count >= NetTransport.MaxClients)
+            {
+                Reject(id, $"A sala está cheia: no máximo {NetTransport.MaxClients + 1} computadores (o host e mais {NetTransport.MaxClients}).");
+                Debug.Log($"[Net] conexão {id} recusada: sala cheia");
                 return;
             }
             var welcome = new MemoryStream();
@@ -378,6 +380,16 @@ public class NetGame : MonoBehaviour
             data[0] = Msg.Pong; // devolve o mesmo horário: o cliente calcula a ida e volta
             transport.Send(id, data, false);
         }
+    }
+
+    /// <summary>Recusa a entrada com uma mensagem; o cliente mostra o motivo e sai sozinho.</summary>
+    void Reject(int id, string why)
+    {
+        var ms = new MemoryStream();
+        var w = new BinaryWriter(ms);
+        w.Write(Msg.Reject);
+        w.Write(why);
+        transport.Send(id, ms.ToArray(), true);
     }
 
     void HostLost(int id)

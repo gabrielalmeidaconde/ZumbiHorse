@@ -12,7 +12,7 @@ using Unity.Services.Relay.Models;
 using UnityEngine;
 
 /// <summary>
-/// Conexão do multiplayer online (Unity Transport). O host aceita até 7 computadores.
+/// Conexão do multiplayer online (Unity Transport). O host aceita até 7 computadores (mais 2 só para avisar que está cheia).
 /// Cada mensagem vai pelo canal confiável (sempre chega, em ordem) ou pelo rápido (pode se perder;
 /// usado para o que é mandado o tempo todo, como os botões e o placar).
 /// Liga pelo Unity Relay (código de sala: funciona pela internet e no navegador) ou por IP (rede local).
@@ -22,6 +22,11 @@ using UnityEngine;
 public class NetTransport : IDisposable
 {
     public const int MaxClients = 7;
+    /// <summary>
+    /// Conexões a mais que o host ainda aceita só para avisar "a sala está cheia" (o NetGame recusa no "olá");
+    /// sem isso o computador a mais era derrubado na hora e via "O host não respondeu.".
+    /// </summary>
+    public const int ExtraSlots = 2;
     public const ushort DefaultPort = 7777;
     /// <summary>Tamanho máximo de uma mensagem (cabe num pacote mesmo passando pelo Relay).</summary>
     public const int MaxMessage = 1100;
@@ -50,7 +55,7 @@ public class NetTransport : IDisposable
     public static async Task<NetTransport> HostRelay()
     {
         await SignIn();
-        var alloc = await RelayService.Instance.CreateAllocationAsync(MaxClients);
+        var alloc = await RelayService.Instance.CreateAllocationAsync(MaxClients + 1); // +1: quem chega com a sala cheia recebe o aviso
         string code = await RelayService.Instance.GetJoinCodeAsync(alloc.AllocationId);
         var data = alloc.ToRelayServerData(RelayProtocol);
         LogEndpoints("sala", alloc.ServerEndpoints);
@@ -202,7 +207,7 @@ public class NetTransport : IDisposable
             NetworkConnection c;
             while ((c = driver.Accept()) != default)
             {
-                if (conns.Count >= MaxClients) { driver.Disconnect(c); continue; }
+                if (conns.Count >= MaxClients + ExtraSlots) { driver.Disconnect(c); continue; }
                 Connected?.Invoke(Track(c));
             }
         }
