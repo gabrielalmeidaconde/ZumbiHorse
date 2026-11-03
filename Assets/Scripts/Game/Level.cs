@@ -274,7 +274,7 @@ public static class Level
         var cc = go.AddComponent<CircleCollider2D>();
         cc.isTrigger = true;
         cc.radius = 0.5f;
-        go.AddComponent<Hazard>();
+        go.AddComponent<Hazard>().Sparks = true;
         var blade = new GameObject("Lamina");
         blade.transform.SetParent(go.transform, false);
         var sr = blade.AddComponent<SpriteRenderer>();

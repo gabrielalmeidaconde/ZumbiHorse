@@ -780,6 +780,14 @@ public partial class GameManager : MonoBehaviour
     {
         finishOrder.Add(z.Index);
         AddFloat(Level.GoalPosition + Vector2.up * 1.2f, "NHAC!", Art.PlayerColor(z.Index), 36, 1.3f);
+        if (finishOrder.Count == 1 && Phase == Phase.Run && Players.Count > 1)
+        {
+            // destaque para quem chegou primeiro
+            Fx.FirstPlace(Level.GoalPosition, Art.PlayerColor(z.Index));
+            Sfx.Play("first", 0.8f);
+            Shake(0.12f);
+            AddFloat(Level.GoalPosition + Vector2.up * 2.1f, "1º LUGAR!", new Color(1f, 0.85f, 0.25f), 30, 1.6f);
+        }
     }
 
     void UpdateRoundEnd()

@@ -50,7 +50,10 @@ public class Zombie : MonoBehaviour
     int dance = -1, lastDance = -1;   // dança atual (-1 = não está dançando)
     bool grounded, wasGrounded, jumpCut;
     int wallDir;
-    bool onIce;
+    bool onIce, onBelt;
+    Wind lastWind;              // para tocar o "fuuu" só quando entra no vento
+    float trailTimer, ghostTimer; // rastro depois da mola (e enquanto o vento empurra)
+    int lastStepFrame = -1;
     Vector2 groundVelocity;     // trem ou esteira embaixo dos pés
     Wind wind;                  // vento do último passo de física
     Portal portalLock;          // portal de onde acabou de sair (não teleporta de volta)
@@ -244,6 +247,7 @@ public class Zombie : MonoBehaviour
         wasGrounded = grounded;
         grounded = false;
         onIce = false;
+        onBelt = false;
         groundVelocity = Vector2.zero;
         GroundTrain = null;
         GroundSeesaw = null;
@@ -260,6 +264,7 @@ public class Zombie : MonoBehaviour
             if (s != null)
             {
                 if (s.Slippery) onIce = true;
+                if (s.ConveyorSpeed != 0f) onBelt = true;
                 groundVelocity += s.ConveyorVelocity;
             }
             var train = h.GetComponentInParent<Train>();
@@ -282,7 +287,8 @@ public class Zombie : MonoBehaviour
         {
             squash = new Vector3(1.25f, 0.78f, 1f);
             Fx.Dust(Position, 3);
-            Sfx.Play("land", 0.5f);
+            Sfx.Play(onIce ? "land_ice" : onBelt ? "land_belt" : "land", 0.5f);
+            lastStepFrame = -1;
         }
     }
 
@@ -344,6 +350,7 @@ public class Zombie : MonoBehaviour
             {
                 rb.linearVelocity = spring.Launch();
                 springCooldown = 0.2f;
+                trailTimer = 0.55f;
                 jumpCut = false;
                 coyoteTimer = 0f;
                 if (Mathf.Abs(spring.Direction.y) < 0.5f) controlLockTimer = 0.3f;
@@ -358,6 +365,8 @@ public class Zombie : MonoBehaviour
             }
         }
         if (!touchingPortal) portalLock = null;
+        if (wind != null && lastWind == null) Sfx.PlayVar("wind", 0.45f);
+        lastWind = wind;
     }
 
     void Teleport(Portal exit)
@@ -379,7 +388,20 @@ public class Zombie : MonoBehaviour
     /// <summary>Encostou numa armadilha: perde uma parte sorteada (pode ser a cabeça). Sem nada para arrancar, morre.</summary>
     void Hurt(Hazard hazard, Collider2D c)
     {
-        if (hazard.Deadly) { Die(hazard.Owner); return; }
+        Vector2 center = Position + Vector2.up * (Height / 2f);
+        if (hazard.Deadly)
+        {
+            // ácido: respingo na superfície e chiado
+            Fx.AcidSplash(Position, c.bounds.max.y);
+            Sfx.PlayVar("sizzle", 0.8f);
+            Die(hazard.Owner);
+            return;
+        }
+        if (hazard.Sparks)
+        {
+            Fx.Sparks(c.ClosestPoint(center));
+            Sfx.PlayVar("spark", 0.7f);
+        }
         var left = System.Array.FindAll(Parts, p => (Missing & p) == 0);
         if (left.Length == 0) { Die(hazard.Owner); return; }
         LoseLimb(left[Random.Range(0, left.Length)], c.bounds.center);
@@ -458,10 +480,24 @@ public class Zombie : MonoBehaviour
 
     // ------------------------------------------------------------------ animação
 
+    /// <summary>Rastro de cópias apagadas depois de uma mola e enquanto o vento leva o zumbi.</summary>
+    void Trail(float dt, Vector2 v)
+    {
+        trailTimer -= dt;
+        bool blown = wind != null && v.sqrMagnitude > 25f;
+        if ((trailTimer <= 0f && !blown) || v.sqrMagnitude < 9f) return;
+        ghostTimer -= dt;
+        if (ghostTimer > 0f) return;
+        ghostTimer = 0.04f;
+        var c = Art.PlayerColor(Index);
+        Fx.Ghost(sr, new Color(c.r, c.g, c.b, blown && trailTimer <= 0f ? 0.3f : 0.45f), sr.sortingOrder - 1);
+    }
+
     void Animate(float dt)
     {
         animTime += dt;
         Vector2 v = rb.linearVelocity;
+        Trail(dt, v);
         Vector2 move = ControlsEnabled && Controls != null ? Controls.Move : Vector2.zero;
         if (ControlsInverted) move.x = -move.x;
         if (controlLockTimer <= 0f)
@@ -494,6 +530,11 @@ public class Zombie : MonoBehaviour
 
         sr.sprite = frames[frame];
         sr.flipX = !faceRight;
+
+        // passos: quadros 2 e 4 da corrida são os pés batendo no chão
+        if (grounded && frame >= 2 && frame != lastStepFrame && (frame == 2 || frame == 4))
+            Sfx.PlayVar(onIce ? "step_ice" : onBelt ? "step_belt" : "step", Legs == 2 ? 0.28f : 0.2f);
+        lastStepFrame = grounded && frame >= 2 ? frame : -1;
 
         squash = Vector3.Lerp(squash, Vector3.one, dt * 12f);
         // balanço de zumbi andando

@@ -20,7 +20,7 @@ public class Crumble : RunBehaviour
         if (state != State.Solid || Item == null || !Item.Placed || !GameManager.RunActive) return;
         state = State.Shaking;
         timer = ShakeTime;
-        Sfx.PlayVar("crack", 0.6f);
+        Sfx.PlayVar("rattle", 0.7f);
     }
 
     public override void OnRunStart() => Restore();
@@ -51,7 +51,8 @@ public class Crumble : RunBehaviour
             Sprite.transform.localPosition = Vector3.zero;
             var c = Sprite.color; c.a = 0.18f; Sprite.color = c;
             Fx.Burst(transform.position, new Color(0.5f, 0.45f, 0.25f), 10, 4f, 0.16f);
-            Sfx.PlayVar("crack", 0.8f);
+            Fx.Dust(transform.position + Vector3.down * 0.4f, 6);
+            Sfx.PlayVar("crumble", 0.8f);
         }
         else if (timer <= 0f)
         {
@@ -65,6 +66,11 @@ public class Crumble : RunBehaviour
                     return;
                 }
             Restore();
+            if (GameManager.RunActive)
+            {
+                Sfx.PlayVar("pop", 0.5f);
+                Fx.Burst(transform.position, new Color(0.6f, 0.55f, 0.3f, 0.8f), 6, 2.5f, 0.1f, 0f, 0.35f);
+            }
         }
     }
 }

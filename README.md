@@ -133,6 +133,20 @@ então dá para perder a cabeça logo no primeiro golpe.
 - Depois de perder uma parte ele é empurrado para longe da armadilha e fica 1 segundo piscando, sem levar dano.
 - O ponto de armadilha só vale quando ela **mata**; arrancar uma parte não dá ponto.
 
+## Efeitos
+
+Tudo é sintetizado na hora (`Core/Sfx.cs`) ou feito com partículas simples (`Core/FxParticle.cs`), e passa pelo
+online como os outros sons e sprites.
+
+- **Passos e pousos** com som diferente no chão, no gelo e na esteira.
+- **Vento** ("fuuu" ao entrar no sopro do ventilador), **portal** (desce entrando e sobe saindo) e **caixa podre**
+  (chacoalha ao pisar, desmorona e dá um "pop" quando volta).
+- **Plataforma móvel** dá um tranco ao virar na ponta e a **gangorra** faz um baque quando bate no limite.
+- **Ácido** respinga verde e chia; **serras** soltam faíscas quando arrancam uma parte.
+- **Rastro** de cópias apagadas na cor do jogador depois de uma mola e enquanto o vento leva o zumbi.
+- **Tela tremendo** na bomba, quando alguém perde uma parte ou morre, e de leve quando o trem passa perto de um zumbi.
+- **Primeiro a chegar no cérebro**: clarão dourado, anel de brilhos, confete, fanfarra e "1º LUGAR!".
+
 ## Pontuação
 
 | Situação | Pontos |

@@ -106,6 +106,22 @@ public class Train : MonoBehaviour
     /// <summary>Corpo do trem (o teto onde dá para pegar carona) daqui a 'ahead' segundos.</summary>
     public Rect PredictBody(float ahead) => new Rect(PredictX(ahead) + 0.7f, y, length - 1.4f, 1.15f); // sem as pontas (para-choques)
 
+    /// <summary>Tela treme de leve enquanto o trem andando passa perto de algum zumbi vivo.</summary>
+    void Rumble()
+    {
+        if (!GameManager.RunActive || pauseTimer > 0f) return;
+        float near = float.MaxValue;
+        foreach (var z in Zombie.All)
+        {
+            if (z == null || z.State != ZombieState.Alive) continue;
+            Vector2 p = z.Position;
+            if (Mathf.Abs(p.y - y) > 3f) continue;
+            float dx = p.x < x ? x - p.x : p.x > x + length ? p.x - (x + length) : 0f;
+            near = Mathf.Min(near, dx);
+        }
+        if (near < 3f) GameManager.Shake(Mathf.Lerp(0.07f, 0.02f, near / 3f));
+    }
+
     void FixedUpdate()
     {
         float dt = Time.fixedDeltaTime;
@@ -119,7 +135,7 @@ public class Train : MonoBehaviour
                 x = Mathf.Clamp(x, minX, maxX);
                 dir = -dir;
                 pauseTimer = EndPause;
-                if (GameManager.RunActive) Sfx.Play("horn", 0.3f);
+                if (GameManager.RunActive) { Sfx.Play("horn", 0.3f); GameManager.Shake(0.06f); }
             }
         }
         rb.MovePosition(new Vector2(x, y));
@@ -128,6 +144,7 @@ public class Train : MonoBehaviour
 
     void Update()
     {
+        Rumble();
         smokeTimer -= Time.deltaTime;
         if (smokeTimer > 0f) return;
         smokeTimer = 0.22f;

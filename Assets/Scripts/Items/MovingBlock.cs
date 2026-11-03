@@ -40,6 +40,13 @@ public class MovingBlock : RunBehaviour
     public override void OnRunStart() { Park(); running = true; logged = false; }
     public override void OnRunEnd() { running = false; Park(); }
 
+    void Clunk()
+    {
+        if (!GameManager.RunActive) return;
+        Sfx.PlayVar("clunk", 0.3f);
+        Fx.Dust(Body.position + Vector2.down * 0.25f, 3);
+    }
+
     void FixedUpdate()
     {
         if (!running) return;
@@ -48,9 +55,10 @@ public class MovingBlock : RunBehaviour
         {
             t = 1f;
             sign = -1;
+            Clunk();
             if (DemoDriver.Active && !logged) { logged = true; Debug.Log($"[Demo] plataforma móvel chegou na ponta em {Body.position}"); }
         }
-        else if (t <= 0f) { t = 0f; sign = 1; }
+        else if (t <= 0f) { t = 0f; sign = 1; Clunk(); }
         float e = t * t * (3f - 2f * t); // freia nas pontas
         Vector2 target = (Vector2)transform.position + dir * (Travel * e);
         Velocity = (target - Body.position) / Time.fixedDeltaTime;

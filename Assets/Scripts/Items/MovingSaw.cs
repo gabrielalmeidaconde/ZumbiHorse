@@ -35,7 +35,7 @@ public class MovingSaw : MonoBehaviour
         var cc = blade.AddComponent<CircleCollider2D>();
         cc.isTrigger = true;
         cc.radius = 0.45f;
-        blade.AddComponent<Hazard>();
+        blade.AddComponent<Hazard>().Sparks = true;
         var vis = new GameObject("Lamina");
         vis.transform.SetParent(blade.transform, false);
         var sr = vis.AddComponent<SpriteRenderer>();
