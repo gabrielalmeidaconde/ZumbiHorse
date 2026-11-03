@@ -73,6 +73,7 @@ public partial class GameManager : MonoBehaviour
     Camera cam;
     static float shake;
     bool paused;
+    public bool Paused => paused;
     float lobbyCountdown = -1f;
 
     readonly List<ItemInstance> boxItems = new List<ItemInstance>();
@@ -82,6 +83,8 @@ public partial class GameManager : MonoBehaviour
 
     float pickTimer, placeTimer, runTimer, doneTimer = -1f;
     bool timeUp, botsOnly;
+    /// <summary>Todos os humanos já morreram ou chegaram e só sobraram bots correndo.</summary>
+    public bool BotsOnly => botsOnly;
     bool nobodyLastRound;   // ninguém chegou na rodada anterior: a próxima caixa traz uma bomba
     readonly List<int> finishOrder = new List<int>();
     string roundMessage = "";
@@ -112,6 +115,7 @@ public partial class GameManager : MonoBehaviour
 
         SetupCamera();
         Sfx.Init(gameObject);
+        gameObject.AddComponent<Music>();
         gameObject.AddComponent<BotSystem>();
         gameObject.AddComponent<NetGame>();
         Level.Build(Maps.All[0]);
