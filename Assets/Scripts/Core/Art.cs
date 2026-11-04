@@ -1751,6 +1751,131 @@ public static class Art
         return c.ToSprite(new Vector2(24, 24), 48, FilterMode.Bilinear);
     });
 
+    // ------------------------------------------------------------------ controle 8-bit (tela de controles)
+
+    public const int GamepadW = 100, GamepadH = 54;
+    static readonly Vector2Int PadDpad = new Vector2Int(27, 26), PadStick = new Vector2Int(41, 41);
+    static readonly Vector2Int[] PadFace = { new Vector2Int(72, 34), new Vector2Int(80, 26), new Vector2Int(64, 26), new Vector2Int(72, 18) }; // A B X Y
+    static readonly Color32[] PadFaceColors = { C(84, 189, 77), C(224, 77, 71), C(71, 133, 242), C(237, 189, 51) };
+    static readonly string[][] PadLetters =
+    {
+        new[] { ".X.", "X.X", "XXX", "X.X", "X.X" },
+        new[] { "XX.", "X.X", "XX.", "X.X", "XX." },
+        new[] { "X.X", "X.X", ".X.", "X.X", "X.X" },
+        new[] { "X.X", "X.X", ".X.", ".X.", ".X." },
+    };
+    public static readonly Color32 PadLit = C(255, 226, 120);
+
+    /// <summary>Onde a linha da legenda encosta em cada peça do controle, em pixels do desenho (y para baixo):
+    /// 0-7 os botões (A B X Y LB RB Start Select, como no GameInput), 8 o direcional e 9 o analógico.</summary>
+    public static Vector2 GamepadAnchor(int part)
+    {
+        switch (part)
+        {
+            case 0: case 1: case 3: return new Vector2(PadFace[part].x + 5f, PadFace[part].y); // A, B e Y pela direita
+            case 2: return new Vector2(PadFace[2].x, PadFace[2].y + 6f);                      // X por baixo
+            case 4: return new Vector2(25f, 3f);
+            case 5: return new Vector2(75f, 3f);
+            case 6: return new Vector2(56.5f, 26f);
+            case 7: return new Vector2(44.5f, 26f);
+            case 8: return new Vector2(PadDpad.x - 9f, PadDpad.y);
+            default: return new Vector2(PadStick.x, PadStick.y + 7.5f);
+        }
+    }
+
+    /// <summary>
+    /// Controle no estilo 8-bit. 'lit' acende as peças apertadas: bits 0-7 os botões (A B X Y LB RB Start Select),
+    /// 8-11 o direcional e 12-15 o analógico (cima, baixo, esquerda, direita).
+    /// </summary>
+    public static Sprite Gamepad(int lit) => Cached($"gamepad_{lit & 0xFFFF}", () =>
+    {
+        bool On(int bit) => (lit & (1 << bit)) != 0;
+        Color32 body = C(196, 192, 210), bodyD = C(150, 144, 170), bodyL = C(226, 224, 236), well = C(170, 165, 188);
+        Color32 dark = C(56, 52, 68), darkL = C(92, 88, 108), white = C(255, 255, 255);
+        var c = new Canvas(GamepadW, GamepadH);
+
+        // LB e RB atrás do corpo (apertado: desce 1 px e acende em cima)
+        for (int i = 0; i < 2; i++)
+        {
+            int x = i == 0 ? 12 : 62, y = On(4 + i) ? 4 : 3;
+            c.Rect(x + 1, y, 24, 8, dark);
+            c.Rect(x, y + 1, 26, 7, dark);
+            c.Rect(x + 2, y + 1, 22, 2, On(4 + i) ? PadLit : darkL);
+        }
+
+        // corpo: duas alças redondas ligadas pelo meio, com sombra embaixo e brilho em cima
+        for (int k = 0; k > -4; k -= 2)
+        {
+            Color32 col = k == 0 ? bodyD : body;
+            c.Disc(27, 29 + k, 21, col);
+            c.Disc(73, 29 + k, 21, col);
+            c.Rect(27, 10 + k, 46, 37, col);
+        }
+        foreach (int cx in new[] { 27, 73 })
+        {
+            c.Set(cx - 14, 15, bodyL); c.Set(cx - 13, 13, bodyL); c.Set(cx - 12, 12, bodyL);
+            c.Set(cx - 11, 11, bodyL); c.Set(cx - 10, 10, bodyL); c.Set(cx - 9, 10, bodyL);
+        }
+        c.Rect(36, 9, 28, 1, bodyL);
+
+        // cavidades do direcional, dos botões e do analógico
+        c.Disc(PadDpad.x, PadDpad.y, 12.5f, well);
+        c.Disc(73, 26, 13.5f, well);
+        c.Disc(PadStick.x, PadStick.y, 7.5f, well);
+
+        // direcional: cada braço acende sozinho
+        int dx = PadDpad.x, dy = PadDpad.y;
+        c.Rect(dx - 3, dy - 9, 6, 6, On(8) ? PadLit : dark);
+        c.Rect(dx - 3, dy + 3, 6, 6, On(9) ? PadLit : dark);
+        c.Rect(dx - 9, dy - 3, 6, 6, On(10) ? PadLit : dark);
+        c.Rect(dx + 3, dy - 3, 6, 6, On(11) ? PadLit : dark);
+        c.Rect(dx - 3, dy - 3, 6, 6, dark);
+        c.Disc(dx, dy, 1.6f, darkL);
+        if (!On(8)) c.Rect(dx - 2, dy - 9, 4, 1, darkL);
+        if (!On(10)) c.Set(dx - 9, dy - 3, darkL);
+        if (!On(11)) c.Rect(dx + 4, dy - 3, 4, 1, darkL);
+
+        // analógico: a cabeça vai 1 px para o lado empurrado
+        int ox = On(15) ? 1 : On(14) ? -1 : 0, oy = On(13) ? 1 : On(12) ? -1 : 0;
+        bool moving = ox != 0 || oy != 0;
+        c.Disc(PadStick.x, PadStick.y, 6f, dark);
+        c.Disc(PadStick.x + ox, PadStick.y + oy, 4.2f, moving ? PadLit : C(84, 80, 100));
+        c.Disc(PadStick.x + ox - 1, PadStick.y + oy - 1, 1.7f, moving ? Color32.Lerp(PadLit, white, 0.5f) : C(120, 116, 138));
+
+        // select e start
+        for (int i = 0; i < 2; i++)
+        {
+            bool on = On(7 - i);
+            int x = i == 0 ? 42 : 54, y = on ? 27 : 26;
+            Color32 col = on ? PadLit : dark;
+            c.Rect(x, y + 1, 5, 2, col);
+            c.Rect(x + 1, y, 3, 1, col);
+            c.Rect(x + 1, y + 3, 3, 1, col);
+        }
+
+        // botões coloridos com a letra (apertado: desce 1 px e clareia)
+        for (int b = 0; b < 4; b++)
+        {
+            bool on = On(b);
+            var p = PadFace[b];
+            Color32 baseCol = PadFaceColors[b], col = on ? Color32.Lerp(baseCol, white, 0.45f) : baseCol;
+            int down = on ? 1 : 0;
+            c.Disc(p.x, p.y + 1, 4.6f, Shade(baseCol, 0.55f));
+            c.Disc(p.x, p.y + down, 4.2f, col);
+            Color32 ink = on ? Shade(baseCol, 0.6f) : Color32.Lerp(col, white, 0.8f);
+            for (int y = 0; y < 5; y++)
+                for (int x = 0; x < 3; x++)
+                    if (PadLetters[b][y][x] == 'X') c.Set(p.x - 1 + x, p.y - 2 + y + down, ink);
+        }
+
+        // logo: cerebrozinho no meio
+        string[] logo = { "..PPPP..", ".PPdPPP.", "PdPPPdPP", "PPPdPPdP", ".PPPPPP.", "...dd..." };
+        c.Map(logo, ch => ch == 'P' ? C(240, 142, 170) : ch == 'd' ? C(196, 88, 128) : (Color32?)null, 46, 13);
+
+        c.AddOutline(Outline);
+        return c.ToSprite(new Vector2(GamepadW / 2f, GamepadH / 2f));
+    });
+
     // ------------------------------------------------------------------ temas (cor do céu por mapa)
 
     public struct ThemeColors

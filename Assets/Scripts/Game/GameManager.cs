@@ -961,22 +961,8 @@ public partial class GameManager : MonoBehaviour
     const string AnyConfirm = "[ESPAÇO] [ENTER] {A}";
     const string AnyDance = "[F] [.] {X}";
 
-    static readonly string[] DeviceTitles = { "TECLADO  ·  WASD", "TECLADO  ·  SETAS", "CONTROLE" };
-    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar", "Trocar zumbi" };
-    static readonly string[,] ControlKeys =
-    {
-        { "[W] [A] [S] [D]", "[<] [^] [v] [>]", "{ANALÓGICO} ou {D-PAD}" },
-        { "[W] ou [ESPAÇO]", "[^]", "{A}" },
-        { "[ESPAÇO]", "[ENTER]", "{A}" },
-        { "[Q] [E]", "[CTRL] [SHIFT] direitos", "{LB} {RB} ou {X} {Y}" },
-        { "[Q]", "[BACKSPACE]", "{B}" },
-        { "[ESC]", "[ESC]", "{START}" },
-        { "[F]", "[.]", "{X}" },
-        { "[R]", "[CTRL] direito", "{LB}" },
-    };
-
     static readonly Color CapEdge = new Color(0.04f, 0.03f, 0.07f), CapFace = new Color(0.93f, 0.91f, 0.97f),
-                          CapSide = new Color(0.58f, 0.55f, 0.66f), CapInk = new Color(0.13f, 0.1f, 0.2f);
+                          CapInk = new Color(0.13f, 0.1f, 0.2f); // a lateral da tecla é a face escurecida
 
     struct KeyPiece { public string Text; public int Kind; public float W, PadL; } // 0 texto, 1 tecla, 2 seta, 3 botão redondo, 4 outro botão do controle
     readonly List<KeyPiece> keyPieces = new List<KeyPiece>();
@@ -1059,12 +1045,13 @@ public partial class GameManager : MonoBehaviour
         }
     }
 
-    void KeyCap(Rect b, string label, int size)
+    void KeyCap(Rect b, string label, int size, Color? face = null)
     {
         float e = Mathf.Max(1f, 2f * S), depth = Mathf.Max(2f, 4f * S);
+        Color top = face ?? CapFace;
         Fill(b, CapEdge);
-        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e), CapSide);
-        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e - depth), CapFace);
+        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e), new Color(top.r * 0.62f, top.g * 0.6f, top.b * 0.68f));
+        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e - depth), top);
         if (label.Length > 0) Text(new Rect(b.x, b.y + e - depth / 2f, b.width, b.height - 2 * e), label, CapTextSize(size), CapInk, TextAnchor.MiddleCenter, false);
     }
 
@@ -1084,52 +1071,6 @@ public partial class GameManager : MonoBehaviour
         Fill(b, CapEdge);
         Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e), new Color(0.3f, 0.29f, 0.37f));
         Text(b, label, CapTextSize(size), Color.white, TextAnchor.MiddleCenter, false);
-    }
-
-    /// <summary>Tabela com os controles de cada tipo de dispositivo. Devolve a altura usada.</summary>
-    float DrawControls(float y)
-    {
-        float tw = Mathf.Min(VW - 60f, 1560f), x0 = (VW - tw) / 2f;
-        float labelW = 200f, colW = (tw - labelW) / 3f, headH = 42f, rowH = 33f;
-        int rows = ControlActions.Length;
-        float h = headH + rows * rowH + 8f;
-        Fill(R(x0, y, tw, h), new Color(0.08f, 0.06f, 0.13f, 0.9f));
-        Fill(R(x0, y, tw, 4), new Color(0.72f, 0.5f, 0.95f));
-        Text(R(x0 + 18, y + 2, labelW, headH), "CONTROLES", 22, new Color(0.85f, 0.7f, 1f), TextAnchor.MiddleLeft);
-
-        for (int r = 0; r < rows; r++)
-        {
-            float ry = y + headH + r * rowH;
-            if (r % 2 == 0) Fill(R(x0, ry, tw, rowH), new Color(1f, 1f, 1f, 0.035f));
-            Text(R(x0 + 18, ry, labelW - 18, rowH), ControlActions[r], 20, new Color(0.82f, 0.8f, 0.9f), TextAnchor.MiddleLeft);
-        }
-
-        for (int d = 0; d < 3; d++)
-        {
-            float cx = x0 + labelW + d * colW;
-            Fill(R(cx, y + 10, 2, h - 18), new Color(1f, 1f, 1f, 0.08f));
-
-            // quem está jogando com este tipo de dispositivo: destaca a coluna para cada um achar os seus botões
-            var users = Players.Where(p => !p.IsBot && (int)p.Input.Kind == d).ToList();
-            if (users.Count > 0) Fill(R(cx + 2, y + 4, colW - 2, h - 4), new Color(users[0].Color.r, users[0].Color.g, users[0].Color.b, 0.09f));
-
-            float chipW = 46f, chipGap = 6f;
-            float titleW = TextWidth(DeviceTitles[d], 20) / S;
-            float groupW = titleW + users.Count * (chipW + chipGap) + (users.Count > 0 ? 8f : 0f);
-            float tx = cx + (colW - groupW) / 2f;
-            Text(R(tx, y + 2, titleW, headH), DeviceTitles[d], 20, users.Count > 0 ? Color.white : new Color(0.75f, 0.73f, 0.82f), TextAnchor.MiddleLeft);
-            float chipX = tx + titleW + 8f;
-            foreach (var u in users)
-            {
-                Fill(R(chipX, y + 10, chipW, 26), u.Color);
-                Text(R(chipX, y + 10, chipW, 26), u.Name, 17, Color.white, TextAnchor.MiddleCenter, false);
-                chipX += chipW + chipGap;
-            }
-
-            for (int r = 0; r < rows; r++)
-                Keys(R(cx + 8, y + headH + r * rowH, colW - 16, rowH), ControlKeys[r, d], 18, new Color(0.88f, 0.86f, 0.95f));
-        }
-        return h;
     }
 
     // ------------------------------------------------------------------ lobby

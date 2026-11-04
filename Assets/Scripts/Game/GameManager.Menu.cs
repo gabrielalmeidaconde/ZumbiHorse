@@ -174,11 +174,15 @@ public partial class GameManager
         bool confirm = false, back = false;
         foreach (var d in ActiveDevices())
         {
-            dy += d.MoveYPressed();
+            int my = d.MoveYPressed();
+            dy += my;
             dx += d.MoveXPressed();
             confirm |= d.ConfirmDown;
             back |= d.BackDown || d.PauseDown;
+            if (!d.Remote && (my != 0 || d.ConfirmDown)) menuDevice = d.Kind;
         }
+        // na tela de controles os botões só acendem no desenho (para testar): sai com VOLTAR, Esc/Start ou clicando
+        if (menuScreen == MenuScreen.Controls) { dy = 0; dx = 0; confirm = false; }
         if (menuClicked >= 0 && menuClicked < menuItems.Count)
         {
             menuSel = menuClicked;
@@ -236,7 +240,7 @@ public partial class GameManager
                 transitionTime = Time.unscaledTime;
                 break;
             case MenuAction.Settings: OpenMenuScreen(MenuScreen.Settings); Sfx.Play("tick"); break;
-            case MenuAction.Controls: OpenMenuScreen(MenuScreen.Controls); Sfx.Play("tick"); break;
+            case MenuAction.Controls: controlsTab = TabOf(menuDevice); OpenMenuScreen(MenuScreen.Controls); Sfx.Play("tick"); break;
             case MenuAction.Quit:
 #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;
@@ -362,17 +366,7 @@ public partial class GameManager
             return;
         }
 
-        Text(R(0, 40, VW, 90), "CONTROLES", 64, new Color(0.85f, 0.7f, 1f));
-        float th = DrawControls(140f);
-        float y = 140f + th + 22f;
-        var hint = new Color(0.7f, 0.85f, 1f);
-        Text(R(0, y, VW, 32), "NO LOBBY", 22, new Color(0.85f, 0.7f, 1f));
-        Keys(R(0, y + 34, VW, 32), "[W] [^] ou CIMA coloca bot  •  [S] [v] ou BAIXO tira  •  [E] [SHIFT] {RB} muda a dificuldade do último bot", 18, hint);
-        Keys(R(0, y + 68, VW, 32), "[A] [D]  [<] [>] troca o mapa  •  [R] [CTRL] {LB} troca o visual do zumbi  •  [O] jogar online  •  [C] {SELECT} criar fase", 18, hint);
-        Text(R(0, y + 112, VW, 32), "NA CORRIDA", 22, new Color(0.85f, 0.7f, 1f));
-        Text(R(0, y + 146, VW, 32), "Segure o pulo para ir mais alto  •  encoste na parede e pule para escalar  •  dance parado no chão", 18, hint);
-        DrawMenuItems(y + 200f, 600f, 64f, 0f);
-        DrawMenuFooter("[Q] [BACKSPACE] {B} ou [ESC] {START}: voltar");
+        DrawControlsScreen(); // GameManager.Controls.cs
     }
 
     /// <summary>Escurece a tela por um instante logo depois de trocar de tela.</summary>

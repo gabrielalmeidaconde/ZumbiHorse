@@ -349,9 +349,41 @@ public class InputSource
         }
     }
 
+    // ------------------------------------------------------------------ tela de controles (testar os botões)
+
+    /// <summary>Botão do controle segurado agora (0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 Start, 7 Select).</summary>
+    public bool PadButtonHeld(int b) => !Remote && PadHeld(b);
+
+    /// <summary>Direcional do controle sozinho (o Move junta ele com o analógico).</summary>
+    public Vector2 PadDpad
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (!Remote && Kind == DeviceKind.Gamepad && Connected) return Pad.dpad.ReadValue();
+#endif
+            return Vector2.zero;
+        }
+    }
+
+    /// <summary>Analógico esquerdo do controle sozinho.</summary>
+    public Vector2 PadStick
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (!Remote && Kind == DeviceKind.Gamepad && Connected) return Pad.leftStick.ReadValue();
+#endif
+            return Vector2.zero;
+        }
+    }
+
+    /// <summary>Tecla deste computador segurada agora.</summary>
+    public static bool KeyHeld(K k) => Held(k);
+
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete }
+    public enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
