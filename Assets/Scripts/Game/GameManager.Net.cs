@@ -20,6 +20,7 @@ public partial class GameManager
 
     bool replicaBotsOnly;
     int savedWinScore;
+    GameMode savedMode;
     /// <summary>No cliente: quantos mapas o lobby do host tem e a fase criada que ele mandou (null = nenhuma).</summary>
     int replicaMapCount;
     MapDef replicaCustomMap;
@@ -70,6 +71,7 @@ public partial class GameManager
         paused = false;
         Time.timeScale = 1f;
         savedWinScore = WinScore;
+        savedMode = Mode;
         replicaCustomMap = null;
         Replica = true;
         SetPhase(Phase.Lobby);
@@ -82,6 +84,7 @@ public partial class GameManager
         boxView.Clear();
         floats.Clear();
         WinScore = savedWinScore;
+        Mode = savedMode;
         paused = false;
         winner = -1;
         lobbyCountdown = -1f;
@@ -151,7 +154,7 @@ public partial class GameManager
         w.Write(pickTimer);
         w.Write(placeTimer);
         w.Write(runTimer);
-        w.Write((byte)((paused ? 1 : 0) | (botsOnly ? 2 : 0) | (nobodyLastRound ? 4 : 0) | (AllowBotsOnly ? 8 : 0)));
+        w.Write((byte)((paused ? 1 : 0) | (botsOnly ? 2 : 0) | (nobodyLastRound ? 4 : 0) | (AllowBotsOnly ? 8 : 0) | (Mode == GameMode.OneLife ? 16 : 0)));
         w.Write((byte)menuScreen);   // menu de pausa: qual tela e qual item (quem mexe é o host)
         w.Write((byte)menuSel);
         w.Write((byte)WinScore);
@@ -209,6 +212,7 @@ public partial class GameManager
         botsOnly = (flags & 2) != 0;
         nobodyLastRound = (flags & 4) != 0;
         replicaBotsOnly = (flags & 8) != 0;
+        Mode = (flags & 16) != 0 ? GameMode.OneLife : GameMode.Parts;
         var screen = (MenuScreen)r.ReadByte();
         if (screen != menuScreen) transitionTime = Time.unscaledTime;
         menuScreen = screen;

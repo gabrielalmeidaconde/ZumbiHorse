@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// Testes automáticos [-zumbiShots pasta]: -zumbiCreatorTest passa por todas as telas do criador de fases e
-/// -zumbiLimbTest leva um zumbi às armadilhas (perder partes e morrer). Conferem cada passo no log
+/// -zumbiLimbTest leva um zumbi às armadilhas (perder partes e morrer, e no modo UMA VIDA morrer de uma vez). Conferem cada passo no log
 /// ("[Teste] OK"/"[Teste] FALHOU") e fecham. -zumbiMapFile fase.txt deixa a fase escolhida no lobby.
 /// </summary>
 public partial class GameManager
@@ -140,6 +140,16 @@ public partial class GameManager
         until = Time.time + 2f;
         while (challengeDeaths < 2 && Time.time < until) yield return null;
         Check(challengeDeaths == 2 && z2.State == ZombieState.Dead && z2.Missing == before, "ácido mata direto");
+
+        // ---- modo UMA VIDA (desafio recomeçado, sem depender dos passos de cima): a serra mata na hora, sem arrancar parte
+        yield return new WaitForSeconds(1.2f);
+        RestartChallenge();
+        var z3 = challengeZombie;
+        z3.OneLife = true;
+        yield return new WaitForFixedUpdate();
+        TestPlaceZombie(new Vector2(Level.Origin.x + 30.5f, Level.Origin.y + 4.3f));
+        yield return new WaitForSeconds(0.3f);
+        Check(challengeDeaths == 1 && z3.State == ZombieState.Dead && z3.Missing == 0, "UMA VIDA: a serra mata na hora, sem arrancar parte");
 
         Debug.Log($"[Teste] FIM: {testChecks - testFails} de {testChecks} passaram");
         Application.Quit(testFails == 0 ? 0 : 1);

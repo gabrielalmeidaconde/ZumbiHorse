@@ -177,6 +177,8 @@ public class InputSource
 
     /// <summary>Botão Select (View) do controle: abre o criador de fases no lobby e testa a fase no editor.</summary>
     public bool SelectDown => !Remote && PadDown(7);
+    /// <summary>Y do controle: troca o modo de jogo no lobby (no teclado é a tecla M).</summary>
+    public bool ModeDown => !Remote && PadDown(3);
 
     /// <summary>Criador de fases: -1/+1 para trocar a peça.</summary>
     public int PieceStep
@@ -349,9 +351,41 @@ public class InputSource
         }
     }
 
+    // ------------------------------------------------------------------ tela de controles (testar os botões)
+
+    /// <summary>Botão do controle segurado agora (0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 Start, 7 Select).</summary>
+    public bool PadButtonHeld(int b) => !Remote && PadHeld(b);
+
+    /// <summary>Direcional do controle sozinho (o Move junta ele com o analógico).</summary>
+    public Vector2 PadDpad
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (!Remote && Kind == DeviceKind.Gamepad && Connected) return Pad.dpad.ReadValue();
+#endif
+            return Vector2.zero;
+        }
+    }
+
+    /// <summary>Analógico esquerdo do controle sozinho.</summary>
+    public Vector2 PadStick
+    {
+        get
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (!Remote && Kind == DeviceKind.Gamepad && Connected) return Pad.leftStick.ReadValue();
+#endif
+            return Vector2.zero;
+        }
+    }
+
+    /// <summary>Tecla deste computador segurada agora.</summary>
+    public static bool KeyHeld(K k) => Held(k);
+
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete }
+    public enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete, M }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
@@ -360,6 +394,8 @@ public class InputSource
     public static bool CreatorKeyDown => Down(K.C);
     /// <summary>Tecla T: testa a fase no criador.</summary>
     public static bool TestKeyDown => Down(K.T);
+    /// <summary>Tecla M: troca o modo de jogo no lobby.</summary>
+    public static bool ModeKeyDown => Down(K.M);
 
 #if ENABLE_INPUT_SYSTEM
     static UnityEngine.InputSystem.Key Map(K k)
@@ -392,6 +428,7 @@ public class InputSource
             case K.Z: return UnityEngine.InputSystem.Key.Z;
             case K.T: return UnityEngine.InputSystem.Key.T;
             case K.Delete: return UnityEngine.InputSystem.Key.Delete;
+            case K.M: return UnityEngine.InputSystem.Key.M;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -458,6 +495,7 @@ public class InputSource
             case K.Z: return KeyCode.Z;
             case K.T: return KeyCode.T;
             case K.Delete: return KeyCode.Delete;
+            case K.M: return KeyCode.M;
             default: return KeyCode.Escape;
         }
     }

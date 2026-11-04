@@ -8,7 +8,7 @@ using UnityEngine;
 /// Modo demonstração / teste automático. Só liga se o executável for aberto com:
 ///   -zumbiDemo [-zumbiBots 4] [-zumbiDiff 0|1|2|mix] [-zumbiRounds 2] [-zumbiShots pasta]
 ///   [-zumbiNoItems] [-zumbiClumsy] [-zumbiWin 10] [-zumbiMap 0-5] [-zumbiBox Portal,Esteira,...]
-///   [-zumbiWall] [-zumbiPauseShot] [-zumbiMute]
+///   [-zumbiWall] [-zumbiPauseShot] [-zumbiMute] [-zumbiMode 0|1] (0 parte por parte, 1 uma vida)
 ///   [-zumbiHostIp] (abre uma sala na rede local)   [-zumbiJoinIp 127.0.0.1] (entra nela com um jogador de teste)
 ///   [-zumbiHostRelay] (abre uma sala com código)     [-zumbiJoinCode ABC123] (entra pelo código)
 /// Coloca bots (a IA de verdade) para jogar sozinhos e salva prints de cada fase.
@@ -56,6 +56,7 @@ public class DemoDriver : MonoBehaviour
         d.joinCode = Arg(args, "-zumbiJoinCode");
         if (int.TryParse(Arg(args, "-zumbiWin"), out int w)) GameManager.WinScore = Mathf.Max(1, w);
         if (int.TryParse(Arg(args, "-zumbiMap"), out int m)) gm.SetMap(m);
+        if (int.TryParse(Arg(args, "-zumbiMode"), out int mode)) gm.Mode = (GameMode)Mathf.Clamp(mode, 0, 1);
         var box = Arg(args, "-zumbiBox");
         if (!string.IsNullOrEmpty(box))
         {
@@ -63,7 +64,7 @@ public class DemoDriver : MonoBehaviour
             foreach (var name in box.Split(','))
                 if (Enum.TryParse(name.Trim(), true, out ItemType t)) GameManager.ForcedBox.Add(t);
         }
-        Debug.Log($"[Demo] ligado: {d.botCount} bots (dificuldade {d.diff}), {d.maxRounds} rodadas, prints em '{d.shotDir}'");
+        Debug.Log($"[Demo] ligado: {d.botCount} bots (dificuldade {d.diff}), {d.maxRounds} rodadas, modo {gm.Mode}, prints em '{d.shotDir}'");
     }
 
     static string Arg(string[] args, string name)

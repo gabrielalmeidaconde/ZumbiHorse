@@ -37,6 +37,8 @@ public class Zombie : MonoBehaviour
     public bool ControlsEnabled = true;
     /// <summary>Partes já arrancadas.</summary>
     public Limb Missing { get; private set; }
+    /// <summary>Modo UMA VIDA: qualquer armadilha mata na hora, sem arrancar partes.</summary>
+    public bool OneLife;
 
     public static readonly List<Zombie> All = new List<Zombie>();
 
@@ -385,7 +387,7 @@ public class Zombie : MonoBehaviour
 
     // ------------------------------------------------------------------ desmembrar
 
-    /// <summary>Encostou numa armadilha: perde uma parte sorteada (pode ser a cabeça). Sem nada para arrancar, morre.</summary>
+    /// <summary>Encostou numa armadilha: perde uma parte sorteada (pode ser a cabeça). Sem nada para arrancar (ou no modo UMA VIDA), morre.</summary>
     void Hurt(Hazard hazard, Collider2D c)
     {
         Vector2 center = Position + Vector2.up * (Height / 2f);
@@ -403,7 +405,7 @@ public class Zombie : MonoBehaviour
             Sfx.PlayVar("spark", 0.7f);
         }
         var left = System.Array.FindAll(Parts, p => (Missing & p) == 0);
-        if (left.Length == 0) { Die(hazard.Owner); return; }
+        if (left.Length == 0 || OneLife) { Die(hazard.Owner); return; }
         LoseLimb(left[Random.Range(0, left.Length)], c.bounds.center);
     }
 

@@ -4,6 +4,9 @@ using UnityEngine;
 
 public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge, Menu }
 
+/// <summary>Modo da partida, escolhido no lobby: cada armadilha arranca uma parte, ou qualquer armadilha mata na hora.</summary>
+public enum GameMode { Parts, OneLife }
+
 public class PlayerSlot
 {
     public int Index;
@@ -65,6 +68,12 @@ public partial class GameManager : MonoBehaviour
     public int MapIndex { get; private set; }
     /// <summary>Mapas do lobby: os do jogo, depois as fases criadas e as recebidas.</summary>
     readonly List<MapDef> lobbyMaps = new List<MapDef>();
+    /// <summary>Modo escolhido no lobby (fica salvo; no online vale o do host).</summary>
+    public GameMode Mode { get; set; }
+    static readonly string[] ModeNames = { "PARTE POR PARTE", "UMA VIDA" };
+    static readonly string[] ModeDetails = { "cada armadilha arranca uma parte", "qualquer armadilha mata" };
+    static readonly Color[] ModeColors = { new Color(1f, 0.62f, 0.3f), new Color(1f, 0.38f, 0.38f) };
+    bool modeClicked;
     /// <summary>Só para testes: força os itens da caixa.</summary>
     public static List<ItemType> ForcedBox;
     /// <summary>Só para testes: deixa a partida começar só com bots.</summary>
@@ -285,6 +294,9 @@ public partial class GameManager : MonoBehaviour
         bool openCreator = creatorClicked || (InputSource.CreatorKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.SelectDown);
         creatorClicked = false;
         if (openCreator && CanCreate) { OpenCreator(); return; }
+        bool changeMode = modeClicked || (InputSource.ModeKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.ModeDown);
+        modeClicked = false;
+        if (changeMode) NextMode();
         // ESC/START volta para o menu principal (no online, para sair da sala use o painel)
         if (!Online && devices.Any(d => !d.Remote && d.PauseDown)) { BackToMenu(); return; }
         foreach (var d in devices)
@@ -311,7 +323,7 @@ public partial class GameManager : MonoBehaviour
                 var last = LastBot;
                 if (last != null) { Players.Remove(last); Sfx.Play("tick"); }
             }
-            if (d.RotateCWDown && LastBot != null)
+            if (d.RotateCWDown && !d.ModeDown && LastBot != null)   // o Y do controle troca o modo
             {
                 var b = LastBot.Bot;
                 b.Difficulty = (BotDifficulty)(((int)b.Difficulty + 1) % 3);
@@ -347,6 +359,14 @@ public partial class GameManager : MonoBehaviour
             if (Mathf.CeilToInt(lobbyCountdown) != before && lobbyCountdown > 0f) Sfx.Play("tick");
             if (lobbyCountdown <= 0f) StartMatch();
         }
+    }
+
+    void NextMode()
+    {
+        Mode = (GameMode)(((int)Mode + 1) % ModeNames.Length);
+        PlayerPrefs.SetInt(PrefMode, (int)Mode);
+        PlayerPrefs.Save();
+        Sfx.Play("tick");
     }
 
     /// <summary>Escolhe o mapa (com volta) e mostra ele atrás do lobby.</summary>
@@ -718,7 +738,11 @@ public partial class GameManager : MonoBehaviour
         finishOrder.Clear();
         timeUp = botsOnly = false;
         runTimer = RunTime;
-        foreach (var p in Players) p.Zombie = Zombie.Spawn(p.Index, p.Skin, p.Input, Level.SpawnPoint(p.Index));
+        foreach (var p in Players)
+        {
+            p.Zombie = Zombie.Spawn(p.Index, p.Skin, p.Input, Level.SpawnPoint(p.Index));
+            p.Zombie.OneLife = Mode == GameMode.OneLife;
+        }
         RunActive = true;
         RunBehaviour.RunStarted();
         Sfx.Play("go");
@@ -1020,22 +1044,8 @@ public partial class GameManager : MonoBehaviour
     const string AnyConfirm = "[ESPAÇO] [ENTER] {A}";
     const string AnyDance = "[F] [.] {X}";
 
-    static readonly string[] DeviceTitles = { "TECLADO  ·  WASD", "TECLADO  ·  SETAS", "CONTROLE" };
-    static readonly string[] ControlActions = { "Mover", "Pular", "Confirmar", "Girar item", "Voltar", "Pausar", "Dançar / trocar", "Trocar zumbi" };
-    static readonly string[,] ControlKeys =
-    {
-        { "[W] [A] [S] [D]", "[<] [^] [v] [>]", "{ANALÓGICO} ou {D-PAD}" },
-        { "[W] ou [ESPAÇO]", "[^]", "{A}" },
-        { "[ESPAÇO]", "[ENTER]", "{A}" },
-        { "[Q] [E]", "[CTRL] [SHIFT] direitos", "{LB} {RB} ou {X} {Y}" },
-        { "[Q]", "[BACKSPACE]", "{B}" },
-        { "[ESC]", "[ESC]", "{START}" },
-        { "[F]", "[.]", "{X}" },
-        { "[R]", "[CTRL] direito", "{LB}" },
-    };
-
     static readonly Color CapEdge = new Color(0.04f, 0.03f, 0.07f), CapFace = new Color(0.93f, 0.91f, 0.97f),
-                          CapSide = new Color(0.58f, 0.55f, 0.66f), CapInk = new Color(0.13f, 0.1f, 0.2f);
+                          CapInk = new Color(0.13f, 0.1f, 0.2f); // a lateral da tecla é a face escurecida
 
     struct KeyPiece { public string Text; public int Kind; public float W, PadL; } // 0 texto, 1 tecla, 2 seta, 3 botão redondo, 4 outro botão do controle
     readonly List<KeyPiece> keyPieces = new List<KeyPiece>();
@@ -1118,12 +1128,13 @@ public partial class GameManager : MonoBehaviour
         }
     }
 
-    void KeyCap(Rect b, string label, int size)
+    void KeyCap(Rect b, string label, int size, Color? face = null)
     {
         float e = Mathf.Max(1f, 2f * S), depth = Mathf.Max(2f, 4f * S);
+        Color top = face ?? CapFace;
         Fill(b, CapEdge);
-        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e), CapSide);
-        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e - depth), CapFace);
+        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e), new Color(top.r * 0.62f, top.g * 0.6f, top.b * 0.68f));
+        Fill(new Rect(b.x + e, b.y + e, b.width - 2 * e, b.height - 2 * e - depth), top);
         if (label.Length > 0) Text(new Rect(b.x, b.y + e - depth / 2f, b.width, b.height - 2 * e), label, CapTextSize(size), CapInk, TextAnchor.MiddleCenter, false);
     }
 
@@ -1145,52 +1156,6 @@ public partial class GameManager : MonoBehaviour
         Text(b, label, CapTextSize(size), Color.white, TextAnchor.MiddleCenter, false);
     }
 
-    /// <summary>Tabela com os controles de cada tipo de dispositivo. Devolve a altura usada.</summary>
-    float DrawControls(float y)
-    {
-        float tw = Mathf.Min(VW - 60f, 1560f), x0 = (VW - tw) / 2f;
-        float labelW = 200f, colW = (tw - labelW) / 3f, headH = 42f, rowH = 33f;
-        int rows = ControlActions.Length;
-        float h = headH + rows * rowH + 8f;
-        Fill(R(x0, y, tw, h), new Color(0.08f, 0.06f, 0.13f, 0.9f));
-        Fill(R(x0, y, tw, 4), new Color(0.72f, 0.5f, 0.95f));
-        Text(R(x0 + 18, y + 2, labelW, headH), "CONTROLES", 22, new Color(0.85f, 0.7f, 1f), TextAnchor.MiddleLeft);
-
-        for (int r = 0; r < rows; r++)
-        {
-            float ry = y + headH + r * rowH;
-            if (r % 2 == 0) Fill(R(x0, ry, tw, rowH), new Color(1f, 1f, 1f, 0.035f));
-            Text(R(x0 + 18, ry, labelW - 18, rowH), ControlActions[r], 20, new Color(0.82f, 0.8f, 0.9f), TextAnchor.MiddleLeft);
-        }
-
-        for (int d = 0; d < 3; d++)
-        {
-            float cx = x0 + labelW + d * colW;
-            Fill(R(cx, y + 10, 2, h - 18), new Color(1f, 1f, 1f, 0.08f));
-
-            // quem está jogando com este tipo de dispositivo: destaca a coluna para cada um achar os seus botões
-            var users = Players.Where(p => !p.IsBot && (int)p.Input.Kind == d).ToList();
-            if (users.Count > 0) Fill(R(cx + 2, y + 4, colW - 2, h - 4), new Color(users[0].Color.r, users[0].Color.g, users[0].Color.b, 0.09f));
-
-            float chipW = 46f, chipGap = 6f;
-            float titleW = TextWidth(DeviceTitles[d], 20) / S;
-            float groupW = titleW + users.Count * (chipW + chipGap) + (users.Count > 0 ? 8f : 0f);
-            float tx = cx + (colW - groupW) / 2f;
-            Text(R(tx, y + 2, titleW, headH), DeviceTitles[d], 20, users.Count > 0 ? Color.white : new Color(0.75f, 0.73f, 0.82f), TextAnchor.MiddleLeft);
-            float chipX = tx + titleW + 8f;
-            foreach (var u in users)
-            {
-                Fill(R(chipX, y + 10, chipW, 26), u.Color);
-                Text(R(chipX, y + 10, chipW, 26), u.Name, 17, Color.white, TextAnchor.MiddleCenter, false);
-                chipX += chipW + chipGap;
-            }
-
-            for (int r = 0; r < rows; r++)
-                Keys(R(cx + 8, y + headH + r * rowH, colW - 16, rowH), ControlKeys[r, d], 18, new Color(0.88f, 0.86f, 0.95f));
-        }
-        return h;
-    }
-
     // ------------------------------------------------------------------ lobby
 
     void DrawLobby()
@@ -1203,6 +1168,7 @@ public partial class GameManager : MonoBehaviour
             Text(R(0, 104, VW, 36), "Monte a fase, arme as armadilhas e seja o único zumbi a comer o cérebro!", 24, new Color(0.9f, 0.85f, 1f));
 
         DrawMapSelector(148f);
+        DrawModeButton(148f);
         DrawCreatorButton(148f);
 
         // 8 lugares: 2 fileiras de 4 cartões (zumbi à esquerda, textos à direita)
@@ -1315,6 +1281,23 @@ public partial class GameManager : MonoBehaviour
         Text(R(x + w - 58, y, 50, h), ">", 60, new Color(1f, 0.9f, 0.5f, pulse));
     }
 
+    /// <summary>Modo de jogo, à esquerda do seletor de mapa (o espelho do botão CRIAR FASE). No online quem troca é o host.</summary>
+    void DrawModeButton(float y)
+    {
+        float w = Mathf.Min(300f, (VW - 980f) / 2f - 40f), h = 125f, x = (VW - 980f) / 2f - 20f - w;
+        var r = R(x, y, w, h);
+        var e = Event.current;
+        if (!Replica && e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition)) { modeClicked = true; e.Use(); }
+        Color mc = ModeColors[(int)Mode];
+        Fill(r, new Color(0.08f, 0.06f, 0.13f, 0.88f));
+        Fill(R(x, y, w, 4), mc);
+        Text(R(x, y + 8, w, 26), "MODO", 17, new Color(0.85f, 0.82f, 0.92f));
+        Text(R(x, y + 32, w, 40), ModeNames[(int)Mode], w >= 260f ? 28 : 20, mc);
+        Text(R(x, y + 68, w, 24), ModeDetails[(int)Mode], w >= 260f ? 16 : 13, new Color(0.85f, 0.82f, 0.92f));
+        if (Replica) Text(R(x, y + 92, w, 26), "o host escolhe", 15, new Color(0.6f, 0.6f, 0.66f));
+        else Keys(R(x, y + 92, w, 26), "[M] {Y} ou clique", 15, new Color(1f, 0.9f, 0.5f));
+    }
+
     /// <summary>Botão do criador de fases, à direita do seletor de mapa.</summary>
     void DrawCreatorButton(float y)
     {
@@ -1379,7 +1362,8 @@ public partial class GameManager : MonoBehaviour
     void DrawTopBar(string title, float timer)
     {
         Fill(R(0, 0, VW, 64), new Color(0.05f, 0.03f, 0.09f, 0.75f));
-        Text(R(24, 0, 500, 64), $"RODADA {Round}  ·  {Level.Map.Name}", 24, new Color(0.8f, 0.75f, 0.95f), TextAnchor.MiddleLeft);
+        Text(R(24, 4, 500, 34), $"RODADA {Round}  ·  {Level.Map.Name}", 24, new Color(0.8f, 0.75f, 0.95f), TextAnchor.MiddleLeft);
+        Text(R(24, 36, 500, 24), ModeNames[(int)Mode], 15, ModeColors[(int)Mode], TextAnchor.MiddleLeft);
         Text(R(0, 0, VW, 64), title, 36, Color.white);
         if (timer >= 0f)
         {
