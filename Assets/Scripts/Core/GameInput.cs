@@ -177,6 +177,8 @@ public class InputSource
 
     /// <summary>Botão Select (View) do controle: abre o criador de fases no lobby e testa a fase no editor.</summary>
     public bool SelectDown => !Remote && PadDown(7);
+    /// <summary>Y do controle: troca o modo de jogo no lobby (no teclado é a tecla M).</summary>
+    public bool ModeDown => !Remote && PadDown(3);
 
     /// <summary>Criador de fases: -1/+1 para trocar a peça.</summary>
     public int PieceStep
@@ -351,7 +353,7 @@ public class InputSource
 
     // ------------------------------------------------------------------ helpers
 
-    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete }
+    enum K { W, A, S, D, Q, E, Space, Up, Down, Left, Right, Enter, NumEnter, Num0, RightCtrl, RightShift, Backspace, Escape, O, F, Period, NumPeriod, C, R, Z, T, Delete, M }
 
     /// <summary>Tecla O: abre/fecha o painel online.</summary>
     public static bool OnlineKeyDown => Down(K.O);
@@ -360,6 +362,8 @@ public class InputSource
     public static bool CreatorKeyDown => Down(K.C);
     /// <summary>Tecla T: testa a fase no criador.</summary>
     public static bool TestKeyDown => Down(K.T);
+    /// <summary>Tecla M: troca o modo de jogo no lobby.</summary>
+    public static bool ModeKeyDown => Down(K.M);
 
 #if ENABLE_INPUT_SYSTEM
     static UnityEngine.InputSystem.Key Map(K k)
@@ -392,6 +396,7 @@ public class InputSource
             case K.Z: return UnityEngine.InputSystem.Key.Z;
             case K.T: return UnityEngine.InputSystem.Key.T;
             case K.Delete: return UnityEngine.InputSystem.Key.Delete;
+            case K.M: return UnityEngine.InputSystem.Key.M;
             default: return UnityEngine.InputSystem.Key.Escape;
         }
     }
@@ -458,6 +463,7 @@ public class InputSource
             case K.Z: return KeyCode.Z;
             case K.T: return KeyCode.T;
             case K.Delete: return KeyCode.Delete;
+            case K.M: return KeyCode.M;
             default: return KeyCode.Escape;
         }
     }

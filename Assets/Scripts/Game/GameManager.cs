@@ -4,6 +4,9 @@ using UnityEngine;
 
 public enum Phase { Lobby, Pick, Place, Run, RoundEnd, Score, Victory, Editor, Challenge, Menu }
 
+/// <summary>Modo da partida, escolhido no lobby: cada armadilha arranca uma parte, ou qualquer armadilha mata na hora.</summary>
+public enum GameMode { Parts, OneLife }
+
 public class PlayerSlot
 {
     public int Index;
@@ -65,6 +68,12 @@ public partial class GameManager : MonoBehaviour
     public int MapIndex { get; private set; }
     /// <summary>Mapas do lobby: os do jogo, depois as fases criadas e as recebidas.</summary>
     readonly List<MapDef> lobbyMaps = new List<MapDef>();
+    /// <summary>Modo escolhido no lobby (fica salvo; no online vale o do host).</summary>
+    public GameMode Mode { get; set; }
+    static readonly string[] ModeNames = { "PARTE POR PARTE", "UMA VIDA" };
+    static readonly string[] ModeDetails = { "cada armadilha arranca uma parte", "qualquer armadilha mata" };
+    static readonly Color[] ModeColors = { new Color(1f, 0.62f, 0.3f), new Color(1f, 0.38f, 0.38f) };
+    bool modeClicked;
     /// <summary>Só para testes: força os itens da caixa.</summary>
     public static List<ItemType> ForcedBox;
     /// <summary>Só para testes: deixa a partida começar só com bots.</summary>
@@ -285,6 +294,9 @@ public partial class GameManager : MonoBehaviour
         bool openCreator = creatorClicked || (InputSource.CreatorKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.SelectDown);
         creatorClicked = false;
         if (openCreator && CanCreate) { OpenCreator(); return; }
+        bool changeMode = modeClicked || (InputSource.ModeKeyDown && !NetGame.PanelOpen) || devices.Any(d => d.ModeDown);
+        modeClicked = false;
+        if (changeMode) NextMode();
         // ESC/START volta para o menu principal (no online, para sair da sala use o painel)
         if (!Online && devices.Any(d => !d.Remote && d.PauseDown)) { BackToMenu(); return; }
         foreach (var d in devices)
@@ -311,7 +323,7 @@ public partial class GameManager : MonoBehaviour
                 var last = LastBot;
                 if (last != null) { Players.Remove(last); Sfx.Play("tick"); }
             }
-            if (d.RotateCWDown && LastBot != null)
+            if (d.RotateCWDown && !d.ModeDown && LastBot != null)   // o Y do controle troca o modo
             {
                 var b = LastBot.Bot;
                 b.Difficulty = (BotDifficulty)(((int)b.Difficulty + 1) % 3);
@@ -347,6 +359,14 @@ public partial class GameManager : MonoBehaviour
             if (Mathf.CeilToInt(lobbyCountdown) != before && lobbyCountdown > 0f) Sfx.Play("tick");
             if (lobbyCountdown <= 0f) StartMatch();
         }
+    }
+
+    void NextMode()
+    {
+        Mode = (GameMode)(((int)Mode + 1) % ModeNames.Length);
+        PlayerPrefs.SetInt(PrefMode, (int)Mode);
+        PlayerPrefs.Save();
+        Sfx.Play("tick");
     }
 
     /// <summary>Escolhe o mapa (com volta) e mostra ele atrás do lobby.</summary>
@@ -718,7 +738,11 @@ public partial class GameManager : MonoBehaviour
         finishOrder.Clear();
         timeUp = botsOnly = false;
         runTimer = RunTime;
-        foreach (var p in Players) p.Zombie = Zombie.Spawn(p.Index, p.Skin, p.Input, Level.SpawnPoint(p.Index));
+        foreach (var p in Players)
+        {
+            p.Zombie = Zombie.Spawn(p.Index, p.Skin, p.Input, Level.SpawnPoint(p.Index));
+            p.Zombie.OneLife = Mode == GameMode.OneLife;
+        }
         RunActive = true;
         RunBehaviour.RunStarted();
         Sfx.Play("go");
@@ -1203,6 +1227,7 @@ public partial class GameManager : MonoBehaviour
             Text(R(0, 104, VW, 36), "Monte a fase, arme as armadilhas e seja o único zumbi a comer o cérebro!", 24, new Color(0.9f, 0.85f, 1f));
 
         DrawMapSelector(148f);
+        DrawModeButton(148f);
         DrawCreatorButton(148f);
 
         // 8 lugares: 2 fileiras de 4 cartões (zumbi à esquerda, textos à direita)
@@ -1315,6 +1340,23 @@ public partial class GameManager : MonoBehaviour
         Text(R(x + w - 58, y, 50, h), ">", 60, new Color(1f, 0.9f, 0.5f, pulse));
     }
 
+    /// <summary>Modo de jogo, à esquerda do seletor de mapa (o espelho do botão CRIAR FASE). No online quem troca é o host.</summary>
+    void DrawModeButton(float y)
+    {
+        float w = Mathf.Min(300f, (VW - 980f) / 2f - 40f), h = 125f, x = (VW - 980f) / 2f - 20f - w;
+        var r = R(x, y, w, h);
+        var e = Event.current;
+        if (!Replica && e.type == EventType.MouseDown && e.button == 0 && r.Contains(e.mousePosition)) { modeClicked = true; e.Use(); }
+        Color mc = ModeColors[(int)Mode];
+        Fill(r, new Color(0.08f, 0.06f, 0.13f, 0.88f));
+        Fill(R(x, y, w, 4), mc);
+        Text(R(x, y + 8, w, 26), "MODO", 17, new Color(0.85f, 0.82f, 0.92f));
+        Text(R(x, y + 32, w, 40), ModeNames[(int)Mode], w >= 260f ? 28 : 20, mc);
+        Text(R(x, y + 68, w, 24), ModeDetails[(int)Mode], w >= 260f ? 16 : 13, new Color(0.85f, 0.82f, 0.92f));
+        if (Replica) Text(R(x, y + 92, w, 26), "o host escolhe", 15, new Color(0.6f, 0.6f, 0.66f));
+        else Keys(R(x, y + 92, w, 26), "[M] {Y} ou clique", 15, new Color(1f, 0.9f, 0.5f));
+    }
+
     /// <summary>Botão do criador de fases, à direita do seletor de mapa.</summary>
     void DrawCreatorButton(float y)
     {
@@ -1379,7 +1421,8 @@ public partial class GameManager : MonoBehaviour
     void DrawTopBar(string title, float timer)
     {
         Fill(R(0, 0, VW, 64), new Color(0.05f, 0.03f, 0.09f, 0.75f));
-        Text(R(24, 0, 500, 64), $"RODADA {Round}  ·  {Level.Map.Name}", 24, new Color(0.8f, 0.75f, 0.95f), TextAnchor.MiddleLeft);
+        Text(R(24, 4, 500, 34), $"RODADA {Round}  ·  {Level.Map.Name}", 24, new Color(0.8f, 0.75f, 0.95f), TextAnchor.MiddleLeft);
+        Text(R(24, 36, 500, 24), ModeNames[(int)Mode], 15, ModeColors[(int)Mode], TextAnchor.MiddleLeft);
         Text(R(0, 0, VW, 64), title, 36, Color.white);
         if (timer >= 0f)
         {

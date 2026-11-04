@@ -120,7 +120,21 @@ Dá para montar a fase com qualquer teclado, controle ou mouse:
   pasta). No navegador, exportar baixa o arquivo e importar abre a janela para escolher o arquivo; copiar e colar
   abre uma caixinha do próprio navegador quando ele não deixa usar a área de transferência direto.
 
-## Armadilhas: o zumbi perde as partes
+## Modos de jogo
+
+No lobby, o quadro **MODO** (à esquerda do mapa) escolhe o que as armadilhas fazem com o zumbi. Troque com **M**
+(teclado), **Y** (controle) ou clicando nele; a escolha fica salva. No online quem escolhe é o host, e quem entrou na
+sala vê o modo dele. Durante a partida o modo aparece no alto da tela, embaixo da rodada.
+
+| Modo | O que a armadilha faz |
+|---|---|
+| **Parte por parte** (padrão) | Arranca uma parte sorteada; sem nada para arrancar, o próximo golpe mata (veja abaixo) |
+| **Uma vida** | Mata na hora, sem arrancar partes |
+
+Nos dois modos, **ácido** e **cair para fora da fase** matam direto, e o ponto de armadilha só vale quando ela mata.
+O desafio do criador de fases é sempre parte por parte.
+
+## Armadilhas: o zumbi perde as partes (modo Parte por parte)
 
 Zumbi não morre fácil: cada armadilha arranca **uma parte sorteada** entre as que sobram (braços, pernas e cabeça),
 então dá para perder a cabeça logo no primeiro golpe.
@@ -202,6 +216,7 @@ A partida começa quando pelo menos 2 jogadores estão prontos. Funciona com qua
 | Pausar | Esc | Esc | Start |
 | Dançar (de novo: sorteia outra dança) | F | . (do teclado numérico ou ao lado da vírgula) | X |
 | Trocar o visual do zumbi (no lobby) | R | Ctrl direito | LB |
+| Trocar o modo de jogo (no lobby) | M | M | Y |
 
 Com o jogo pausado abre o menu de pausa (veja [Menu principal, pausa e configurações](#menu-principal-pausa-e-configurações)).
 O zumbi também desliza e pula na parede.
@@ -429,10 +444,11 @@ Outras opções: `-zumbiNoItems` (bots colocam itens fora do caminho), `-zumbiCl
 jogador de teste que aperta os botões sozinho). Para testar o online sem abrir janelas, rode os dois com
 `-batchmode -nographics`; o log mostra o tráfego e quantos sprites o cliente está copiando.
 `-zumbiWin N` (pontos para vencer), `-zumbiMap N` (0 a 4 = mapa, 5 = aleatório),
-`-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots).
+`-zumbiBox Portal,Esteira,...` (força os itens da caixa), `-zumbiDiff 0|1|2|mix` (dificuldade dos bots),
+`-zumbiMode 0|1` (0 = parte por parte, 1 = uma vida).
 
 `-zumbiLimbTest` leva um zumbi aos espinhos, a uma serra na altura da cabeça e ao ácido e confere as partes que
-ele perde, os controles trocados sem cabeça e quando morre. `-zumbiCreatorTest` testa o criador de fases sozinho (montar com itens, desfazer, aviso de caminho, testar, desistir,
+ele perde, os controles trocados sem cabeça e quando morre; no fim, confere que no modo Uma vida a serra mata na hora. `-zumbiCreatorTest` testa o criador de fases sozinho (montar com itens, desfazer, aviso de caminho, testar, desistir,
 copiar, colar, exportar, importar, fases recebidas e partida em grupo com bots), escreve `[Teste] OK`/`[Teste] FALHOU`
 no log, tira prints com `-zumbiShots` e fecha. `-zumbiMapFile fase.txt` deixa uma fase criada escolhida no lobby
 (junto com `-zumbiDemo -zumbiHostIp`, testa o host mandando a fase para o cliente). Nos dois, as fases e os recordes

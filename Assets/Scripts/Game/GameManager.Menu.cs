@@ -22,7 +22,7 @@ public partial class GameManager
 
     // ================================================================== configurações
 
-    const string PrefVolume = "config_volume", PrefWinScore = "config_pontos", PrefShake = "config_tremer";
+    const string PrefVolume = "config_volume", PrefWinScore = "config_pontos", PrefShake = "config_tremer", PrefMode = "config_modo";
     const int MinWinScore = 3, MaxWinScore = 30;
     int volume = 10;                        // 0 a 10 (de 10 em 10%)
     bool shakeOn = true;
@@ -33,6 +33,7 @@ public partial class GameManager
         AudioListener.volume = volume / 10f;
         WinScore = Mathf.Clamp(PlayerPrefs.GetInt(PrefWinScore, WinScore), MinWinScore, MaxWinScore);
         shakeOn = PlayerPrefs.GetInt(PrefShake, 1) != 0;
+        Mode = (GameMode)Mathf.Clamp(PlayerPrefs.GetInt(PrefMode, 0), 0, ModeNames.Length - 1);
     }
 
     static bool CanQuit => Application.platform != RuntimePlatform.WebGLPlayer;
