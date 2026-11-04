@@ -33,8 +33,13 @@ e as configurações ficam só no menu principal, porque cada computador tem as 
 | Tremer a tela | Liga/desliga o tremor quando alguém morre ou algo explode |
 
 Esquerda/direita mudam o valor (CONFIRMAR ou clicar passa para o próximo). Tudo fica salvo no computador
-(`PlayerPrefs`; a tela cheia e a resolução o próprio Unity guarda). A tela **Controles** mostra a tabela com as
-teclas de cada tipo de dispositivo e os atalhos do lobby.
+(`PlayerPrefs`; a tela cheia e a resolução o próprio Unity guarda).
+
+A tela **Controles** tem três abas: **Controle** (um controle 8-bit desenhado), **Teclado · WASD** e
+**Teclado · Setas** (os dois lados do teclado). Cada botão tem uma legenda com uma linha que vai até ele. O que você
+aperta acende no desenho e na legenda, então dá para testar o controle ali. A aba muda sozinha para o aparelho que
+está sendo usado (e abre na aba de quem escolheu CONTROLES); com o mouse, clique na aba. Nessa tela CONFIRMAR não
+sai (só acende): para voltar use VOLTAR (Q, Backspace ou B), Esc/Start ou clique em **VOLTAR**.
 
 ## Bots (jogadores do computador)
 
@@ -224,9 +229,9 @@ Dá para dançar no lobby, no placar e na corrida (parado no chão). O zumbi dan
 e cada aperto sorteia outra dança das raças do World of Warcraft (26 no total: a masculina e a feminina de cada raça).
 Os bots às vezes comemoram dançando no placar quando chegam no cérebro.
 
-No lobby, o cartão de cada jogador mostra os botões dele (ficar pronto, trocar o visual, sair). A tabela com os
-controles de cada tipo de dispositivo fica em **Controles**, no menu principal e na pausa (a coluna de quem está
-jogando com ele fica destacada com a cor do jogador). Durante a escolha e o posicionamento, cada cursor
+No lobby, o cartão de cada jogador mostra os botões dele (ficar pronto, trocar o visual, sair). Os desenhos com
+todos os botões ficam em **Controles**, no menu principal e na pausa (na aba de cada aparelho aparecem as cores de
+quem está jogando com ele). Durante a escolha e o posicionamento, cada cursor
 mostra os botões daquele jogador, e nas duas primeiras corridas aparece um lembrete de como pular.
 
 ## Visuais dos zumbis
@@ -405,7 +410,8 @@ Assets/
     Game/
       GameManager.cs     fases da partida, pontuação e toda a interface (IMGUI)
       GameManager.Net.cs modo cópia do cliente online, estado da interface pela rede, painel online
-      GameManager.Menu.cs    menu principal, menu de pausa, configurações (salvas) e tela de controles
+      GameManager.Menu.cs    menu principal, menu de pausa e configurações (salvas)
+      GameManager.Controls.cs  tela de controles: controle 8-bit e teclados desenhados, com legendas e teste dos botões
       MapDefs.cs         os mapas, desenhados em texto (legenda no topo do arquivo)
       MapCode.cs         fases criadas: código e texto, salvas, recebidas, recordes, arquivos e trens automáticos
       GameManager.Editor.cs  criador de fases e desafio solo contra o relógio
