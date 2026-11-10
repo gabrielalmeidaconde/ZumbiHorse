@@ -130,7 +130,7 @@ public partial class GameManager
                         Screen.fullScreen ? "SIM" : "NÃO", CanChangeVideo);
                 AddItem(MenuAction.Resolution, "RESOLUÇÃO", CanChangeVideo ? (Screen.fullScreen ? "nitidez da imagem na tela cheia" : "tamanho da janela") : "só no jogo baixado",
                         $"{Screen.width} x {Screen.height}", CanChangeVideo);
-                AddItem(MenuAction.WinPoints, "PONTOS PARA VENCER", "o primeiro a chegar nesses pontos vence a partida", WinScore.ToString());
+                AddItem(MenuAction.WinPoints, "PONTOS PARA VENCER", $"no modo Parte por parte é o triplo ({WinScore * PartsScale})", WinScore.ToString());
                 AddItem(MenuAction.ScreenShake, "TREMER A TELA", "quando alguém morre ou algo explode", shakeOn ? "SIM" : "NÃO");
                 AddItem(MenuAction.Back, "VOLTAR");
                 break;

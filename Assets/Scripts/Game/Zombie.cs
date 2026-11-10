@@ -77,6 +77,8 @@ public class Zombie : MonoBehaviour
     public Seesaw GroundSeesaw { get; private set; }
 
     public bool Headless => (Missing & Limb.Head) != 0;
+    /// <summary>Quantas partes já perdeu (0 a 5).</summary>
+    public int PartsLost => System.Array.FindAll(Parts, p => (Missing & p) != 0).Length;
     /// <summary>Sem cabeça o corpo não enxerga: esquerda e direita trocadas (os bots compensam sozinhos).</summary>
     public bool ControlsInverted => Headless && (Controls == null || Controls.Kind != DeviceKind.Bot);
     int Legs => ((Missing & Limb.BackLeg) == 0 ? 1 : 0) + ((Missing & Limb.FrontLeg) == 0 ? 1 : 0);

@@ -6,7 +6,8 @@ using UnityEngine;
 
 /// <summary>
 /// Testes automáticos [-zumbiShots pasta]: -zumbiCreatorTest passa por todas as telas do criador de fases e
-/// -zumbiLimbTest leva um zumbi às armadilhas (perder partes e morrer, e no modo UMA VIDA morrer de uma vez). Conferem cada passo no log
+/// -zumbiLimbTest leva um zumbi às armadilhas (perder partes e morrer, e no modo UMA VIDA morrer de uma vez) e
+/// -zumbiScoreTest confere os pontos da rodada nos dois modos. Conferem cada passo no log
 /// ("[Teste] OK"/"[Teste] FALHOU") e fecham. -zumbiMapFile fase.txt deixa a fase escolhida no lobby.
 /// </summary>
 public partial class GameManager
@@ -38,6 +39,7 @@ public partial class GameManager
 
         testShots = Arg("-zumbiShots");
         if (args.Contains("-zumbiLimbTest")) { MapCode.TestMode = true; StartCoroutine(LimbTest()); return; }
+        if (args.Contains("-zumbiScoreTest")) { MapCode.TestMode = true; StartCoroutine(ScoreTest()); return; }
         if (!args.Contains("-zumbiCreatorTest")) return;
         MapCode.TestMode = true;
         MapCode.ClearTest();
@@ -45,11 +47,13 @@ public partial class GameManager
     }
 
     /// <summary>Põe o zumbi do desafio com os pés em (x, y) do mundo.</summary>
-    void TestPlaceZombie(Vector2 feet)
+    void TestPlaceZombie(Vector2 feet) => TestPlaceZombie(challengeZombie, feet);
+
+    static void TestPlaceZombie(Zombie z, Vector2 feet)
     {
-        challengeZombie.transform.position = feet;
-        challengeZombie.GetComponent<Rigidbody2D>().position = feet;
-        challengeZombie.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
+        z.transform.position = feet;
+        z.GetComponent<Rigidbody2D>().position = feet;
+        z.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
         Physics2D.SyncTransforms();
     }
 
@@ -154,6 +158,67 @@ public partial class GameManager
         Debug.Log($"[Teste] FIM: {testChecks - testFails} de {testChecks} passaram");
         Application.Quit(testFails == 0 ? 0 : 1);
     }
+
+    /// <summary>Pontos dos dois modos, com 3 jogadores parados (ninguém mexe neles) numa fase com uma serra.</summary>
+    IEnumerator ScoreTest()
+    {
+        yield return new WaitForSeconds(0.5f);
+        var map = MapCode.NewMap("Teste dos pontos");
+        MapCode.Set(map, 30, 5, 'X');
+        Level.Build(map);
+        for (int i = 0; i < 3; i++) AddPlayer(new InputSource { Kind = DeviceKind.Bot });
+
+        yield return ScoreRound(GameMode.Parts, 2, 0, -1);
+        Check(RoundSum(0) == 4 + 3 && RoundSum(1) == 6 && RoundSum(2) == 0,
+              $"parte por parte: chegar sem 2 partes vale 4 (+3 do primeiro), inteiro vale 6 ({RoundText()})");
+        yield return ScoreRound(GameMode.Parts, 0, 1, 0);
+        Check(RoundSum(0) == 6 + 3 && RoundSum(1) == 5 && RoundSum(2) == 6,
+              $"parte por parte: todos chegaram, mas um se machucou: todos pontuam ({RoundText()})");
+        yield return ScoreRound(GameMode.Parts, 0, 0, 0);
+        Check(Players.All(p => p.RoundPoints.Count == 0) && roundMessage.StartsWith("FÁCIL DEMAIS"),
+              $"parte por parte: todos chegaram inteiros: ninguém pontua ({roundMessage})");
+        Check(TargetScore == WinScore * 3, $"parte por parte: a meta é o triplo da configurada ({TargetScore})");
+
+        yield return ScoreRound(GameMode.OneLife, 0, 0, -1);
+        Check(RoundSum(0) == 2 + 1 && RoundSum(1) == 2 && RoundSum(2) == 0, $"uma vida: chegar vale 2 (+1 do primeiro) ({RoundText()})");
+        yield return ScoreRound(GameMode.OneLife, 0, 0, 0);
+        Check(Players.All(p => p.RoundPoints.Count == 0) && roundMessage.StartsWith("FÁCIL DEMAIS"),
+              $"uma vida: todos chegaram: ninguém pontua ({roundMessage})");
+        Check(TargetScore == WinScore, $"uma vida: a meta é a configurada ({TargetScore})");
+
+        Debug.Log($"[Teste] FIM: {testChecks - testFails} de {testChecks} passaram");
+        Application.Quit(testFails == 0 ? 0 : 1);
+    }
+
+    /// <summary>Uma rodada em que o jogador i leva hits[i] golpes da serra (-1 = morre) e depois vai para o cérebro, na ordem P1, P2, P3.</summary>
+    IEnumerator ScoreRound(GameMode mode, params int[] hits)
+    {
+        Mode = mode;
+        foreach (var p in Players) p.Score = p.PrevScore = 0;
+        BeginRun();
+        yield return new WaitForSeconds(0.3f);
+        var saw = new Vector2(Level.Origin.x + 30.5f, Level.Origin.y + 4.3f);
+        for (int i = 0; i < hits.Length; i++)
+            for (int h = 0; h < hits[i]; h++)
+            {
+                yield return new WaitForFixedUpdate();
+                TestPlaceZombie(Players[i].Zombie, saw);
+                yield return new WaitForSeconds(1.2f);   // empurrão e 1 s piscando
+            }
+        for (int i = 0; i < hits.Length; i++)
+        {
+            yield return new WaitForFixedUpdate();
+            if (hits[i] < 0) Players[i].Zombie.Die(-1);
+            else TestPlaceZombie(Players[i].Zombie, Level.GoalPosition + Vector2.down * 0.45f);
+            yield return new WaitForSeconds(0.2f);
+        }
+        float until = Time.time + 5f;
+        while (Phase != Phase.Score && Time.time < until) yield return null;
+        Debug.Log($"[Teste] rodada {mode}: {RoundText()}  ({roundMessage})");
+    }
+
+    int RoundSum(int i) => Players[i].RoundPoints.Sum(kv => kv.Value);
+    string RoundText() => string.Join("  |  ", Players.Select(p => $"{p.Name}: {string.Join(", ", p.RoundPoints.Select(kv => $"+{kv.Value} {kv.Key}"))}"));
 
     void Check(bool ok, string what)
     {

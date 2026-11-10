@@ -137,7 +137,8 @@ sala vê o modo dele. Durante a partida o modo aparece no alto da tela, embaixo 
 | **Uma vida** | Mata na hora, sem arrancar partes |
 
 Nos dois modos, **ácido** e **cair para fora da fase** matam direto, e o ponto de armadilha só vale quando ela mata.
-O desafio do criador de fases é sempre parte por parte.
+O desafio do criador de fases é sempre parte por parte. A pontuação também muda de um modo para o outro (veja
+[Pontuação](#pontuação)).
 
 ## Armadilhas: o zumbi perde as partes (modo Parte por parte)
 
@@ -168,15 +169,18 @@ online como os outros sons e sprites.
 
 ## Pontuação
 
-| Situação | Pontos |
-|---|---|
-| Chegar no cérebro | +2 |
-| Ser o primeiro a chegar | +1 |
-| Outro zumbi morrer na sua armadilha | +1 por zumbi (só vale se alguém chegou) |
-| **Todos** chegaram | ninguém pontua ("Fácil demais!") |
-| Ninguém chegou | ninguém pontua |
+| Situação | Uma vida | Parte por parte |
+|---|---|---|
+| Chegar no cérebro | +2 | +6 inteiro, **−1 por parte perdida** (sem as 5 partes: +1) |
+| Ser o primeiro a chegar | +1 | +3 |
+| Outro zumbi morrer na sua armadilha | +1 por zumbi | +3 por zumbi |
+| Ninguém pontua ("Fácil demais!") | quando **todos** chegaram | quando todos chegaram **sem perder nenhuma parte** |
+| Ninguém chegou | ninguém pontua | ninguém pontua |
 
-Quem fizer **10 pontos** primeiro vence (em caso de empate, joga-se mais uma rodada).
+O ponto de armadilha só vale se alguém chegou. Quem fizer os **pontos para vencer** primeiro ganha (10 por padrão, dá
+para mudar em Configurações; em caso de empate, joga-se mais uma rodada). No modo **Parte por parte** os pontos e a
+meta valem o triplo (30 por padrão), porque lá morrer é difícil e quase todo mundo chega: o que separa os jogadores é
+quantas partes cada um perdeu no caminho.
 
 Para a partida não travar:
 

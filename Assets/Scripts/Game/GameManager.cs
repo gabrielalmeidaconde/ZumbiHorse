@@ -54,6 +54,8 @@ public partial class GameManager : MonoBehaviour
     /// <summary>Quando todos os humanos já morreram ou chegaram, os bots têm no máximo este tempo.</summary>
     const float BotsOnlyTime = 12f;
     const int PointsGoal = 2, PointsFirst = 1, PointsTrap = 1;
+    // modo Parte por parte: os pontos e a meta valem o triplo, e chegar no cérebro perde 1 ponto por parte perdida
+    const int PartsScale = 3;
 
     public static GameManager Instance { get; private set; }
     public static bool RunActive;
@@ -74,6 +76,9 @@ public partial class GameManager : MonoBehaviour
     static readonly string[] ModeDetails = { "cada armadilha arranca uma parte", "qualquer armadilha mata" };
     static readonly Color[] ModeColors = { new Color(1f, 0.62f, 0.3f), new Color(1f, 0.38f, 0.38f) };
     bool modeClicked;
+    int PointsScale => Mode == GameMode.Parts ? PartsScale : 1;
+    /// <summary>Pontos para vencer a partida: no modo Parte por parte é o triplo do configurado (WinScore).</summary>
+    public int TargetScore => WinScore * PointsScale;
     /// <summary>Só para testes: força os itens da caixa.</summary>
     public static List<ItemType> ForcedBox;
     /// <summary>Só para testes: deixa a partida começar só com bots.</summary>
@@ -768,9 +773,8 @@ public partial class GameManager : MonoBehaviour
         {
             RunActive = false;
             RunBehaviour.RunEnded();
-            int n = Players.Count;
             if (timeUp) { roundMessage = "TEMPO ESGOTADO!"; roundMessageColor = new Color(1f, 0.6f, 0.3f); }
-            else if (finishOrder.Count == n) { roundMessage = "FÁCIL DEMAIS!"; roundMessageColor = new Color(1f, 0.85f, 0.3f); }
+            else if (TooEasy) { roundMessage = "FÁCIL DEMAIS!"; roundMessageColor = new Color(1f, 0.85f, 0.3f); }
             else if (finishOrder.Count == 0) { roundMessage = "NINGUÉM CHEGOU!"; roundMessageColor = new Color(1f, 0.4f, 0.4f); }
             else { roundMessage = "FIM DA RODADA"; roundMessageColor = new Color(0.6f, 1f, 0.5f); }
             SetPhase(Phase.RoundEnd);
@@ -829,10 +833,25 @@ public partial class GameManager : MonoBehaviour
         SetPhase(Phase.Score);
     }
 
+    /// <summary>
+    /// Ninguém pontua: todos chegaram no cérebro. No modo Parte por parte, onde morrer é difícil, só quando
+    /// todos chegaram sem perder nenhuma parte.
+    /// </summary>
+    bool TooEasy => finishOrder.Count == Players.Count &&
+                    (Mode == GameMode.OneLife || Players.All(p => p.Zombie == null || p.Zombie.PartsLost == 0));
+
+    /// <summary>Pontos por chegar: no modo Parte por parte, 1 a menos por parte perdida.</summary>
+    KeyValuePair<string, int> GoalPoints(PlayerSlot p)
+    {
+        if (Mode != GameMode.Parts) return new KeyValuePair<string, int>("Chegou", PointsGoal);
+        int lost = p.Zombie != null ? p.Zombie.PartsLost : 0;
+        string label = lost == 0 ? "Chegou inteiro" : lost == 1 ? "Chegou sem 1 parte" : $"Chegou sem {lost} partes";
+        return new KeyValuePair<string, int>(label, PointsGoal * PartsScale - lost);
+    }
+
     void ComputeScores()
     {
-        int n = Players.Count;
-        bool tooEasy = finishOrder.Count == n;
+        bool tooEasy = TooEasy;
         bool nobody = finishOrder.Count == 0;
         nobodyLastRound = nobody;
         foreach (var p in Players)
@@ -840,13 +859,16 @@ public partial class GameManager : MonoBehaviour
             p.RoundPoints.Clear();
             p.PrevScore = p.Score;
             if (tooEasy) continue;
-            if (finishOrder.Contains(p.Index)) p.RoundPoints.Add(new KeyValuePair<string, int>("Chegou", PointsGoal));
-            if (finishOrder.Count > 0 && finishOrder[0] == p.Index) p.RoundPoints.Add(new KeyValuePair<string, int>("Primeiro", PointsFirst));
+            if (finishOrder.Contains(p.Index)) p.RoundPoints.Add(GoalPoints(p));
+            if (finishOrder.Count > 0 && finishOrder[0] == p.Index) p.RoundPoints.Add(new KeyValuePair<string, int>("Primeiro", PointsFirst * PointsScale));
             if (!nobody && p.Kills > 0)
-                p.RoundPoints.Add(new KeyValuePair<string, int>(p.Kills > 1 ? $"Armadilha x{p.Kills}" : "Armadilha", PointsTrap * p.Kills));
+                p.RoundPoints.Add(new KeyValuePair<string, int>(p.Kills > 1 ? $"Armadilha x{p.Kills}" : "Armadilha", PointsTrap * PointsScale * p.Kills));
             p.Score += p.RoundPoints.Sum(kv => kv.Value);
+            if (DemoDriver.Active)
+                Debug.Log($"[Demo] pontos {p.Name} (perdeu {(p.Zombie != null ? p.Zombie.PartsLost : 0)}): {string.Join(", ", p.RoundPoints.Select(kv => $"+{kv.Value} {kv.Key}"))} = {p.Score}/{TargetScore}");
         }
-        if (tooEasy) roundMessage = "FÁCIL DEMAIS! Todo mundo chegou, ninguém pontua.";
+        if (DemoDriver.Active && tooEasy) Debug.Log("[Demo] pontos: fácil demais, ninguém pontua");
+        if (tooEasy) roundMessage = Mode == GameMode.Parts ? "FÁCIL DEMAIS! Ninguém se machucou, ninguém pontua." : "FÁCIL DEMAIS! Todo mundo chegou, ninguém pontua.";
         else if (nobody) roundMessage = "NINGUÉM CHEGOU! Ninguém pontua.";
         else roundMessage = "";
     }
@@ -861,7 +883,7 @@ public partial class GameManager : MonoBehaviour
 
         int best = Players.Max(p => p.Score);
         var leaders = Players.Where(p => p.Score == best).ToList();
-        if (best >= WinScore && leaders.Count == 1)
+        if (best >= TargetScore && leaders.Count == 1)
         {
             winner = leaders[0].Index;
             SetPhase(Phase.Victory);
@@ -1245,7 +1267,10 @@ public partial class GameManager : MonoBehaviour
         float y = 966f, bw = Mathf.Min(VW - 60f, 1560f);
         Fill(R((VW - bw) / 2f, y - 4f, bw, 100f), new Color(0.05f, 0.03f, 0.09f, 0.8f));
         Keys(R(0, y, VW, 32), "BOTS:  [W] [^] ou CIMA adiciona  •  [S] [v] ou BAIXO tira  •  [E] [SHIFT] {RB} muda a dificuldade do último", 17, hint);
-        Text(R(0, y + 32, VW, 28), $"Primeiro a fazer {WinScore} pontos vence.  Chegar no cérebro: +{PointsGoal}  •  Primeiro: +{PointsFirst}  •  Matar com sua armadilha: +{PointsTrap}  •  Se todos chegarem, ninguém pontua!", 18, new Color(0.65f, 0.95f, 0.6f));
+        string rules = Mode == GameMode.Parts
+            ? $"Vence quem fizer {TargetScore} pontos.  Chegar: +{PointsGoal * PartsScale}, −1 por parte perdida  •  Primeiro: +{PointsFirst * PartsScale}  •  Matar com sua armadilha: +{PointsTrap * PartsScale}  •  Ninguém se machucou? Ninguém pontua!"
+            : $"Primeiro a fazer {TargetScore} pontos vence.  Chegar no cérebro: +{PointsGoal}  •  Primeiro: +{PointsFirst}  •  Matar com sua armadilha: +{PointsTrap}  •  Se todos chegarem, ninguém pontua!";
+        Text(R(0, y + 32, VW, 28), rules, VW < 1700f ? 16 : 18, new Color(0.65f, 0.95f, 0.6f));
         string pads = InputSource.GamepadsSupported ? $"Controles conectados: {InputSource.GamepadCount}" : "Input System não ativo: só teclado";
         string menu = Online ? "" : "   •   [ESC] {START} voltar ao menu";
         Keys(R(0, y + 62, VW, 28), pads + menu + "   •   [O] jogar online   •   [C] {SELECT} criar fase", 15, new Color(0.6f, 0.6f, 0.66f));
@@ -1519,7 +1544,10 @@ public partial class GameManager : MonoBehaviour
         if (!string.IsNullOrEmpty(roundMessage)) Text(R(0, 150, VW, 50), roundMessage, 32, new Color(1f, 0.85f, 0.4f));
 
         // linhas de 150 px; com mais de 4 jogadores elas encolhem (k) para caber na tela
-        float segW = 90f, barX = (VW - segW * WinScore) / 2f + 60f, rowH = Mathf.Min(150f, 680f / Mathf.Max(1, Players.Count));
+        // um pedaço da barra por ponto: com muitos pontos para vencer os pedaços afinam para a barra caber
+        int target = TargetScore;
+        float segW = Mathf.Min(90f, (VW - 420f) / target), gap = segW >= 30f ? 3f : 1f;
+        float barX = (VW - segW * target) / 2f + 60f, rowH = Mathf.Min(150f, 680f / Mathf.Max(1, Players.Count));
         float k = rowH / 150f;
         float y0 = 250f + (680f - rowH * Players.Count) * 0.5f;
         float grow = Mathf.Clamp01((PhaseTime - 0.4f) / 1.0f);
@@ -1539,25 +1567,25 @@ public partial class GameManager : MonoBehaviour
             if (p.IsBot) Text(R(barX - 120, y + 52 * k, 110, 30 * k), "CPU " + p.Bot.Label, Sz(16, 12), p.Bot.LabelColor, TextAnchor.MiddleLeft);
 
             float shown = Mathf.Lerp(p.PrevScore, p.Score, grow);
-            for (int s = 0; s < WinScore; s++)
+            for (int s = 0; s < target; s++)
             {
-                var r = R(barX + s * segW + 3, y + 10 * k, segW - 6, 60 * k);
+                var r = R(barX + s * segW + gap, y + 10 * k, segW - 2f * gap, 60 * k);
                 Fill(r, new Color(1f, 1f, 1f, 0.08f));
                 float fill = Mathf.Clamp01(shown - s);
                 if (fill <= 0f) continue;
                 Color c = s < p.PrevScore ? p.Color : Color.Lerp(Color.white, p.Color, 0.35f + 0.25f * Mathf.Sin(Time.time * 8f));
                 Fill(new Rect(r.x, r.y, r.width * fill, r.height), c);
             }
-            if (p.Score > WinScore)
-                Text(R(barX + WinScore * segW + 10, y, 120, 80 * k), $"+{p.Score - WinScore}", Sz(30, 18), p.Color, TextAnchor.MiddleLeft);
+            if (p.Score > target)
+                Text(R(barX + target * segW + 10, y, 120, 80 * k), $"+{p.Score - target}", Sz(30, 18), p.Color, TextAnchor.MiddleLeft);
 
             string pts = string.Join("    ", p.RoundPoints.Select(kv => $"+{kv.Value} {kv.Key}"));
-            Text(R(barX, y + 74 * k, segW * WinScore, 40 * k), pts, Sz(24, 14), new Color(0.9f, 0.9f, 0.95f), TextAnchor.MiddleLeft);
-            Text(R(barX + segW * WinScore - 200, y + 74 * k, 200, 40 * k), $"{p.Score} pts", Sz(26, 15), p.Color, TextAnchor.MiddleRight);
+            Text(R(barX, y + 74 * k, segW * target, 40 * k), pts, Sz(24, 14), new Color(0.9f, 0.9f, 0.95f), TextAnchor.MiddleLeft);
+            Text(R(barX + segW * target - 200, y + 74 * k, 200, 40 * k), $"{p.Score} pts", Sz(26, 15), p.Color, TextAnchor.MiddleRight);
         }
 
         // linha de chegada do placar
-        float lineX = barX + segW * WinScore;
+        float lineX = barX + segW * target;
         Fill(R(lineX - 2, y0 - 20, 4, Players.Count * rowH), new Color(1f, 0.6f, 0.75f, 0.9f));
         DrawSprite(R(lineX - 30, y0 - 70, 60, 48), Art.Brain, Color.white);
 
